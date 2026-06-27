@@ -1,8 +1,10 @@
 import React, { useRef, useEffect, useCallback } from 'react';
-import { Search, ScanLine, Upload, ShoppingCart, History, X } from 'lucide-react';
+import { Search, Mic, ScanLine, Upload, ShoppingCart, History, X } from 'lucide-react';
 import { useSearchStore } from '../store/useSearchStore';
 import { useOrderStore } from '../store/useOrderStore';
+import { useVoiceSearch } from '../hooks/useVoiceSearch';
 import { useDebounce } from '../hooks/useDebounce';
+import { cn } from '../lib/utils';
 
 interface SearchHeaderProps {
   onUploadClick: () => void;
@@ -19,6 +21,21 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
   const toggleDrawer = useOrderStore(state => state.toggleDrawer);
   
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const { isListening, isSupported: voiceSupported, startListening, stopListening } = useVoiceSearch({
+    onResult: useCallback((text) => {
+      setQuery(text);
+      performSearch(text);
+    }, [setQuery, performSearch]),
+  });
+
+  const handleVoiceToggle = useCallback(() => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  }, [isListening, startListening, stopListening]);
 
   useEffect(() => {
     performSearch(debouncedQuery);
@@ -51,7 +68,7 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
                 value={query}
                 onChange={handleChange}
                 placeholder="Search SKU, description, keyword..."
-                className="w-full pl-10 pr-16 sm:pr-20 py-2.5 sm:py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-sm sm:text-base transition-all"
+                className="w-full pl-10 pr-16 sm:pr-24 py-2.5 sm:py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-sm sm:text-base transition-all"
               />
               <div className="absolute right-2 flex items-center gap-1">
                 {query && (
@@ -60,6 +77,20 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
                     className="p-1.5 text-slate-400 hover:text-white transition-colors"
                   >
                     <X size={18} />
+                  </button>
+                )}
+                {voiceSupported && (
+                  <button
+                    onClick={handleVoiceToggle}
+                    className={cn(
+                      "p-1.5 sm:p-2 rounded-lg transition-all hidden sm:block",
+                      isListening
+                        ? "bg-red-500 text-white animate-pulse"
+                        : "text-slate-400 hover:text-white hover:bg-slate-700"
+                    )}
+                    title="Voice search"
+                  >
+                    <Mic size={18} />
                   </button>
                 )}
                 <button

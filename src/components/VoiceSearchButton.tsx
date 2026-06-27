@@ -31,7 +31,7 @@ export function VoiceSearchButton() {
   if (!isSupported) return null;
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 pointer-events-none">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 pointer-events-none sm:hidden">
       {isListening && transcript && (
         <div className="bg-slate-900 text-white px-4 py-2 rounded-xl text-sm max-w-xs text-center shadow-lg animate-fade-in pointer-events-none">
           {transcript}

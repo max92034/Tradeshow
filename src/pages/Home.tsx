@@ -40,7 +40,7 @@ export default function Home() {
         onHistoryClick={() => setHistoryOpen(true)}
       />
       
-      <main className="px-3 sm:px-6 py-4 sm:py-6 pb-28 sm:pb-32">
+      <main className="px-3 sm:px-6 py-4 sm:py-6 pb-28 sm:pb-6">
         {!isLoaded || products.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 sm:py-24 text-center">
             <div className="w-20 h-20 bg-cyan-100 rounded-full flex items-center justify-center mb-6">
