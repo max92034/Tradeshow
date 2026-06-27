@@ -23,9 +23,10 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
   }, [onResult]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'mediaDevices' in window && 'MediaRecorder' in window) {
-      setIsSupported(true);
-    }
+    // MediaRecorder is supported in all modern browsers (Chrome, Edge, Firefox, Safari)
+    // We don't check for mediaDevices here because it might not be available during SSR/hydration
+    // The actual permission check happens in startListening()
+    setIsSupported(true);
   }, []);
 
   useEffect(() => {

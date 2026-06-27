@@ -53,7 +53,7 @@ export function VoiceSearchButton() {
 
   if (!isSupported) {
     return (
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 sm:hidden">
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
         <div className="px-4 py-2 rounded-xl text-sm bg-amber-500 text-white text-center shadow-lg">
           Voice not supported on this browser
         </div>
@@ -64,7 +64,7 @@ export function VoiceSearchButton() {
   const showIndicator = isListening || isProcessing || error || transcript;
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-3 sm:hidden">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-3">
       {showIndicator && (
         <div className={cn(
           "px-4 py-3 rounded-2xl text-sm max-w-[80vw] text-center shadow-xl font-medium",
