@@ -4,6 +4,7 @@ import { ResultsGrid } from '@/components/ResultsGrid';
 import { UploadModal } from '@/components/UploadModal';
 import { OrderDrawer } from '@/components/OrderDrawer';
 import { OrderHistoryModal } from '@/components/OrderHistoryModal';
+import { VoiceSearchButton } from '@/components/VoiceSearchButton';
 import { useSearchStore } from '@/store/useSearchStore';
 import { useProductStore } from '@/store/useProductStore';
 import { useOrderStore } from '@/store/useOrderStore';
@@ -39,7 +40,7 @@ export default function Home() {
         onHistoryClick={() => setHistoryOpen(true)}
       />
       
-      <main className="px-3 sm:px-6 py-4 sm:py-6">
+      <main className="px-3 sm:px-6 py-4 sm:py-6 pb-28 sm:pb-32">
         {!isLoaded || products.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 sm:py-24 text-center">
             <div className="w-20 h-20 bg-cyan-100 rounded-full flex items-center justify-center mb-6">
@@ -97,6 +98,7 @@ export default function Home() {
       <UploadModal isOpen={uploadOpen} onClose={() => setUploadOpen(false)} />
       <OrderDrawer isOpen={isDrawerOpen} onClose={() => toggleDrawer(false)} />
       <OrderHistoryModal isOpen={historyOpen} onClose={() => setHistoryOpen(false)} />
+      <VoiceSearchButton />
     </div>
   );
 }
