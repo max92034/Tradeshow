@@ -30,7 +30,7 @@ interface SpeechRecognition extends EventTarget {
   maxAlternatives: number;
   onresult: ((event: SpeechRecognitionEvent) => void) | null;
   onend: (() => void) | null;
-  onerror: ((event: Event) => void) | null;
+  onerror: ((event: Event | { error?: string }) => void) | null;
   onstart: (() => void) | null;
   start(): void;
   stop(): void;
@@ -47,12 +47,13 @@ interface UseVoiceSearchOptions {
   lang?: string;
 }
 
-export function useVoiceSearch({ onResult, lang = 'en-US' }: UseVoiceSearchOptions) {
+export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptions) {
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [transcript, setTranscript] = useState('');
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const finalTranscriptRef = useRef('');
+  const interimTranscriptRef = useRef('');
 
   useEffect(() => {
     if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
@@ -66,7 +67,11 @@ export function useVoiceSearch({ onResult, lang = 'en-US' }: UseVoiceSearchOptio
         recognitionRef.current.onend = null;
         recognitionRef.current.onerror = null;
         recognitionRef.current.onresult = null;
-        recognitionRef.current.abort();
+        try {
+          recognitionRef.current.abort();
+        } catch (_e) {
+          // ignore
+        }
         recognitionRef.current = null;
       }
     };
@@ -92,37 +97,40 @@ export function useVoiceSearch({ onResult, lang = 'en-US' }: UseVoiceSearchOptio
     }
 
     const recognition = new SpeechRecognitionCtor();
+    // Support both Chinese and English
     recognition.lang = lang;
     recognition.interimResults = true;
-    recognition.continuous = true;
+    recognition.continuous = false;
     recognition.maxAlternatives = 1;
     recognitionRef.current = recognition;
     finalTranscriptRef.current = '';
+    interimTranscriptRef.current = '';
     setTranscript('');
 
     recognition.onresult = (event: unknown) => {
       const e = event as { resultIndex: number; results: Array<Array<{ transcript: string }> & { isFinal: boolean }> };
-      let interimTranscript = '';
-      let finalChunk = '';
+      let newFinal = '';
+      let newInterim = '';
       
-      for (let i = e.resultIndex; i < e.results.length; i++) {
+      for (let i = 0; i < e.results.length; i++) {
         const transcriptText = e.results[i][0].transcript;
         if (e.results[i].isFinal) {
-          finalChunk += transcriptText;
+          newFinal += transcriptText;
         } else {
-          interimTranscript += transcriptText;
+          newInterim += transcriptText;
         }
       }
-
-      if (finalChunk) {
-        finalTranscriptRef.current += finalChunk;
-      }
       
-      setTranscript(finalTranscriptRef.current + interimTranscript);
+      if (newFinal) {
+        finalTranscriptRef.current += newFinal;
+      }
+      interimTranscriptRef.current = newInterim;
+      
+      setTranscript(finalTranscriptRef.current + interimTranscriptRef.current);
     };
 
     recognition.onend = () => {
-      const finalText = finalTranscriptRef.current.trim();
+      const finalText = (finalTranscriptRef.current + interimTranscriptRef.current).trim();
       if (finalText) {
         onResult(finalText);
       }
@@ -130,13 +138,20 @@ export function useVoiceSearch({ onResult, lang = 'en-US' }: UseVoiceSearchOptio
       setTranscript('');
       recognitionRef.current = null;
       finalTranscriptRef.current = '';
+      interimTranscriptRef.current = '';
     };
 
-    recognition.onerror = () => {
+    recognition.onerror = (event: unknown) => {
+      const err = event as { error?: string };
+      // Ignore "no-speech" errors - they just mean the user didn't say anything
+      if (err.error === 'no-speech' || err.error === 'aborted') {
+        // Don't treat these as errors
+      }
       setIsListening(false);
       setTranscript('');
       recognitionRef.current = null;
       finalTranscriptRef.current = '';
+      interimTranscriptRef.current = '';
     };
 
     recognition.onstart = () => {
@@ -146,7 +161,8 @@ export function useVoiceSearch({ onResult, lang = 'en-US' }: UseVoiceSearchOptio
     try {
       recognition.start();
     } catch (_e) {
-      // ignore if already started
+      setIsListening(false);
+      recognitionRef.current = null;
     }
   }, [isSupported, lang, onResult]);
 
@@ -155,7 +171,7 @@ export function useVoiceSearch({ onResult, lang = 'en-US' }: UseVoiceSearchOptio
       try {
         recognitionRef.current.stop();
       } catch (_e) {
-        // ignore
+        // ignore - might already be stopped
       }
     }
   }, []);

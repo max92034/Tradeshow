@@ -14,6 +14,7 @@ export function VoiceSearchButton() {
       setQuery(text);
       performSearch(text);
     }, [setQuery, performSearch]),
+    lang: 'zh-CN',
   });
 
   const handleStart = useCallback(() => {

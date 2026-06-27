@@ -27,6 +27,7 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
       setQuery(text);
       performSearch(text);
     }, [setQuery, performSearch]),
+    lang: 'zh-CN',
   });
 
   const handleVoiceToggle = useCallback(() => {
