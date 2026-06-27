@@ -92,7 +92,11 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
 
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
     }
+
+    setError(null);
+    setTranscript('');
 
     const recognition = new SpeechRecognitionCtor();
     recognition.lang = lang;
@@ -106,7 +110,6 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
 
     recognition.onstart = () => {
       setIsListening(true);
-      setError(null);
 
       // Auto-stop after 5 seconds of silence as fallback
       timeoutRef.current = setTimeout(() => {
@@ -156,26 +159,24 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
         return;
       }
 
-      if (errorCode === 'no-speech') {
-        return;
-      }
-
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
       }
 
       if (errorCode === 'not-allowed' || errorCode === 'service-not-allowed') {
-        setError('Microphone denied - check browser permissions');
+        setError('Mic permission denied - tap ⚙️ in Chrome to allow');
       } else if (errorCode === 'network') {
-        setError('Network error - check internet');
+        setError('Network error - need internet for voice search');
       } else if (errorCode === 'audio-capture') {
-        setError('No microphone found');
+        setError('No microphone found on this device');
+      } else if (errorCode === 'no-speech') {
+        setError('No speech detected - speak louder or closer');
       } else {
-        setError(errorCode);
+        setError('Error: ' + errorCode);
       }
 
       setIsListening(false);
-      setTranscript('');
       recognitionRef.current = null;
     };
 

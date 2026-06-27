@@ -64,19 +64,19 @@ export function VoiceSearchButton() {
   const showIndicator = isListening || error || transcript;
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 sm:hidden">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-3 sm:hidden">
       {showIndicator && (
         <div className={cn(
-          "px-4 py-2 rounded-xl text-sm max-w-xs text-center shadow-lg min-h-[40px] flex items-center justify-center",
+          "px-4 py-3 rounded-2xl text-sm max-w-[80vw] text-center shadow-xl font-medium",
           error ? "bg-red-500 text-white" : "bg-slate-900 text-white"
         )}>
           {error ? (
-            <span className="flex items-center justify-center gap-1">
-              <AlertCircle size={14} />
-              {error}
-            </span>
+            <div className="flex flex-col items-center gap-1">
+              <AlertCircle size={20} />
+              <span>{error}</span>
+            </div>
           ) : transcript ? (
-            <span className="font-medium">{transcript}</span>
+            <span>{transcript}</span>
           ) : (
             <span>Listening... speak now</span>
           )}
@@ -101,8 +101,8 @@ export function VoiceSearchButton() {
           <span className="absolute inset-0 rounded-full bg-red-400 animate-ping opacity-75" />
         )}
       </button>
-      <p className="text-xs text-slate-500 font-medium">
-        {isListening ? "Release to search" : error ? "Tap to retry" : "Hold to speak"}
+      <p className="text-xs text-slate-500 font-medium text-center">
+        {isListening ? "Release to search" : error ? "Press and hold to retry" : "Hold to speak"}
       </p>
     </div>
   );
