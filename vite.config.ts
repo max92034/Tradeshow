@@ -5,7 +5,7 @@ import { traeBadgePlugin } from 'vite-plugin-trae-solo-badge';
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: process.env.VERCEL ? '/' : '/Tradeshow/',
+  base: process.env.VITE_BASE || '/Tradeshow/',
   build: {
     sourcemap: 'hidden',
   },

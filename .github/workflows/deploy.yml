@@ -38,7 +38,7 @@ jobs:
         
       - name: Build (GitHub Pages)
         env:
-          VERCEL: ''
+          VITE_BASE: '/Tradeshow/'
         run: npm run build
         
       - name: Upload artifact
@@ -69,6 +69,8 @@ jobs:
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build Vercel Project
+        env:
+          VITE_BASE: '/'
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy to Vercel
