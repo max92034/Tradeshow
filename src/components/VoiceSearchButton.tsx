@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect, useState } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { Mic, AlertCircle } from 'lucide-react';
 import { useVoiceSearch } from '../hooks/useVoiceSearch';
 import { useSearchStore } from '../store/useSearchStore';
@@ -8,10 +8,10 @@ export function VoiceSearchButton() {
   const setQuery = useSearchStore(state => state.setQuery);
   const performSearch = useSearchStore(state => state.performSearch);
   const isHoldingRef = useRef(false);
-  const [pressed, setPressed] = useState(false);
 
   const { isListening, isSupported, transcript, error, startListening, stopListening } = useVoiceSearch({
     onResult: useCallback((text) => {
+      console.log('[VoiceSearchButton] onResult:', text);
       setQuery(text);
       performSearch(text);
     }, [setQuery, performSearch]),
@@ -19,54 +19,59 @@ export function VoiceSearchButton() {
   });
 
   const handleStart = useCallback(() => {
+    console.log('[VoiceSearchButton] handleStart, isHolding:', isHoldingRef.current);
     if (isHoldingRef.current) return;
     isHoldingRef.current = true;
-    setPressed(true);
     startListening();
   }, [startListening]);
 
   const handleStop = useCallback(() => {
+    console.log('[VoiceSearchButton] handleStop, isHolding:', isHoldingRef.current);
     if (!isHoldingRef.current) return;
     isHoldingRef.current = false;
-    setPressed(false);
     stopListening();
   }, [stopListening]);
 
   useEffect(() => {
-    const onDocMouseUp = () => { if (isHoldingRef.current) handleStop(); };
-    const onDocTouchEnd = () => { if (isHoldingRef.current) handleStop(); };
-    const onDocTouchCancel = () => { if (isHoldingRef.current) handleStop(); };
+    const onMouseUp = () => { if (isHoldingRef.current) handleStop(); };
+    const onTouchEnd = () => { if (isHoldingRef.current) handleStop(); };
+    const onTouchCancel = () => { if (isHoldingRef.current) handleStop(); };
 
-    document.addEventListener('mouseup', onDocMouseUp);
-    document.addEventListener('touchend', onDocTouchEnd);
-    document.addEventListener('touchcancel', onDocTouchCancel);
+    document.addEventListener('mouseup', onMouseUp);
+    document.addEventListener('touchend', onTouchEnd);
+    document.addEventListener('touchcancel', onTouchCancel);
 
     return () => {
-      document.removeEventListener('mouseup', onDocMouseUp);
-      document.removeEventListener('touchend', onDocTouchEnd);
-      document.removeEventListener('touchcancel', onDocTouchCancel);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.removeEventListener('touchend', onTouchEnd);
+      document.removeEventListener('touchcancel', onTouchCancel);
     };
   }, [handleStop]);
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
+    console.log('[VoiceSearchButton] touchStart');
     e.stopPropagation();
     handleStart();
   }, [handleStart]);
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
+    console.log('[VoiceSearchButton] mouseDown');
     e.stopPropagation();
     handleStart();
   }, [handleStart]);
 
-  if (!isSupported) return null;
+  if (!isSupported) {
+    console.log('[VoiceSearchButton] Not supported, returning null');
+    return null;
+  }
 
-  const showIndicator = isListening || error || pressed;
+  const showIndicator = isListening || error;
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 pointer-events-none sm:hidden">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 sm:hidden">
       {showIndicator && (
         <div className={cn(
-          "px-4 py-2 rounded-xl text-sm max-w-xs text-center shadow-lg pointer-events-none",
+          "px-4 py-2 rounded-xl text-sm max-w-xs text-center shadow-lg",
           error ? "bg-red-500 text-white" : "bg-slate-900 text-white"
         )}>
           {error ? (
@@ -74,28 +79,23 @@ export function VoiceSearchButton() {
               <AlertCircle size={14} />
               {error}
             </span>
-          ) : transcript ? (
-            transcript
-          ) : pressed && !isListening ? (
-            "Starting..."
           ) : (
-            "Listening..."
+            transcript || "Listening..."
           )}
         </div>
       )}
       <button
         onMouseDown={onMouseDown}
         onTouchStart={onTouchStart}
+        onTouchEnd={handleStop}
+        onTouchCancel={handleStop}
         className={cn(
-          "w-16 h-16 rounded-full flex items-center justify-center shadow-2xl transition-all pointer-events-auto select-none",
-          "touch-manipulation relative",
+          "w-16 h-16 rounded-full flex items-center justify-center shadow-2xl transition-all select-none touch-manipulation relative",
           error
             ? "bg-amber-500 text-white"
             : isListening
               ? "bg-red-500 text-white scale-110"
-              : pressed
-                ? "bg-cyan-700 text-white scale-95"
-                : "bg-cyan-600 hover:bg-cyan-700 text-white active:scale-90"
+              : "bg-cyan-600 text-white"
         )}
         aria-label="Hold to voice search"
       >
@@ -104,7 +104,7 @@ export function VoiceSearchButton() {
           <span className="absolute inset-0 rounded-full bg-red-400 animate-ping opacity-75" />
         )}
       </button>
-      <p className="text-xs text-slate-500 font-medium pointer-events-none">
+      <p className="text-xs text-slate-500 font-medium">
         {isListening ? "Release to search" : error ? "Tap to retry" : "Hold to speak"}
       </p>
     </div>

@@ -31,7 +31,7 @@ interface SpeechRecognition extends EventTarget {
   onresult: ((event: SpeechRecognitionEvent) => void) | null;
   onend: (() => void) | null;
   onerror: ((event: Event | { error?: string; message?: string }) => void) | null;
-  onstart: (() => void) | null;
+  onstart: (() => void) | void;
   start(): void;
   stop(): void;
   abort(): void;
@@ -54,184 +54,168 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
   const [error, setError] = useState<string | null>(null);
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const activeRef = useRef(false);
-  const finalTextRef = useRef('');
-  const interimTextRef = useRef('');
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onResultRef = useRef(onResult);
-  const langRef = useRef(lang);
 
   useEffect(() => {
     onResultRef.current = onResult;
   }, [onResult]);
 
   useEffect(() => {
-    langRef.current = lang;
-  }, [lang]);
-
-  useEffect(() => {
     if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
       setIsSupported(true);
+      console.log('[VoiceSearch] Speech recognition supported');
     }
   }, []);
 
   useEffect(() => {
     return () => {
-      activeRef.current = false;
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
       if (recognitionRef.current) {
-        recognitionRef.current.onend = null;
-        recognitionRef.current.onerror = null;
-        recognitionRef.current.onresult = null;
-        recognitionRef.current.onstart = null;
         try {
           recognitionRef.current.abort();
-        } catch (_e) {
-          // ignore
-        }
-        recognitionRef.current = null;
+        } catch (_e) { /* ignore */ }
       }
     };
   }, []);
 
-  const createRecognition = useCallback((): SpeechRecognition | null => {
+  const startListening = useCallback(() => {
+    console.log('[VoiceSearch] startListening called, isSupported:', isSupported);
+
+    if (!isSupported) {
+      console.log('[VoiceSearch] Not supported');
+      return;
+    }
+
     const SpeechRecognitionCtor = (window as unknown as {
       SpeechRecognition?: new () => SpeechRecognition;
       webkitSpeechRecognition?: new () => SpeechRecognition;
     }).SpeechRecognition || (window as unknown as { webkitSpeechRecognition: new () => SpeechRecognition }).webkitSpeechRecognition;
 
-    if (!SpeechRecognitionCtor) return null;
+    if (!SpeechRecognitionCtor) {
+      console.log('[VoiceSearch] Constructor not found');
+      return;
+    }
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
 
     const recognition = new SpeechRecognitionCtor();
-    recognition.lang = langRef.current;
+    recognition.lang = lang;
     recognition.interimResults = true;
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.maxAlternatives = 1;
+    recognitionRef.current = recognition;
+
+    let finalTranscript = '';
+    let interimTranscript = '';
+
+    recognition.onstart = () => {
+      console.log('[VoiceSearch] Recognition started');
+      setIsListening(true);
+      setError(null);
+    };
 
     recognition.onresult = (event: unknown) => {
       const e = event as { resultIndex: number; results: Array<Array<{ transcript: string }> & { isFinal: boolean }> };
-      let interim = '';
-      let finalChunk = '';
+      interimTranscript = '';
+      finalTranscript = '';
 
-      for (let i = e.resultIndex; i < e.results.length; i++) {
+      for (let i = 0; i < e.results.length; i++) {
         const t = e.results[i][0].transcript;
         if (e.results[i].isFinal) {
-          finalChunk += t;
+          finalTranscript += t;
+          console.log('[VoiceSearch] Final result:', t);
         } else {
-          interim += t;
+          interimTranscript += t;
+          console.log('[VoiceSearch] Interim result:', t);
         }
       }
 
-      if (finalChunk) {
-        finalTextRef.current += finalChunk;
-      }
-      interimTextRef.current = interim;
-      setTranscript(finalTextRef.current + interim);
+      const displayText = finalTranscript + interimTranscript;
+      setTranscript(displayText);
+
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        console.log('[VoiceSearch] Timeout reached, finalizing');
+        if (recognitionRef.current) {
+          try {
+            recognitionRef.current.stop();
+          } catch (_e) { /* ignore */ }
+        }
+      }, 3000);
     };
 
     recognition.onerror = (event: unknown) => {
       const err = event as { error?: string };
       const errorCode = err.error || 'unknown';
+      console.log('[VoiceSearch] Error:', errorCode);
 
       if (errorCode === 'aborted') {
         return;
       }
 
       if (errorCode === 'no-speech') {
-        if (activeRef.current) {
-          return;
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
         }
+        return;
       }
 
       if (errorCode === 'not-allowed' || errorCode === 'service-not-allowed') {
-        setError('Microphone permission denied');
+        setError('Microphone denied - check browser permissions');
       } else if (errorCode === 'network') {
         setError('Network error');
       } else if (errorCode === 'audio-capture') {
         setError('No microphone found');
-      } else if (errorCode !== 'no-speech') {
+      } else {
         setError(errorCode);
       }
 
       setIsListening(false);
       setTranscript('');
-      recognitionRef.current = null;
-      finalTextRef.current = '';
-      interimTextRef.current = '';
-      activeRef.current = false;
     };
 
     recognition.onend = () => {
-      if (activeRef.current) {
-        const currentFinal = finalTextRef.current + interimTextRef.current;
-        if (currentFinal.trim()) {
-          finalTextRef.current = currentFinal.trim() + ' ';
-          interimTextRef.current = '';
-          setTranscript(finalTextRef.current);
-        }
-
-        try {
-          if (recognitionRef.current) {
-            recognitionRef.current.start();
-            return;
-          }
-        } catch (_e) {
-          // fall through to finalize
-        }
-      }
-
-      const text = (finalTextRef.current + interimTextRef.current).trim();
+      console.log('[VoiceSearch] Recognition ended, final:', finalTranscript, 'interim:', interimTranscript);
       setIsListening(false);
-      setTranscript('');
       recognitionRef.current = null;
-      finalTextRef.current = '';
-      interimTextRef.current = '';
+
+      const text = (finalTranscript || interimTranscript).trim();
+      setTranscript('');
+
       if (text) {
+        console.log('[VoiceSearch] Returning result:', text);
         onResultRef.current(text);
       }
     };
 
-    recognition.onstart = () => {
-      setIsListening(true);
-      setError(null);
-    };
-
-    return recognition;
-  }, []);
-
-  const startListening = useCallback(() => {
-    if (!isSupported || activeRef.current) return;
-
-    setError(null);
-    finalTextRef.current = '';
-    interimTextRef.current = '';
-    setTranscript('');
-    activeRef.current = true;
-
-    const recognition = createRecognition();
-    if (!recognition) {
-      activeRef.current = false;
-      setError('Speech recognition not supported');
-      return;
-    }
-
-    recognitionRef.current = recognition;
-
     try {
+      console.log('[VoiceSearch] Calling recognition.start()');
       recognition.start();
-    } catch (_e) {
+    } catch (e) {
+      console.log('[VoiceSearch] Failed to start:', e);
       setIsListening(false);
-      setError('Failed to start recognition');
+      setError('Failed to start');
       recognitionRef.current = null;
-      activeRef.current = false;
     }
-  }, [isSupported, createRecognition]);
+  }, [isSupported, lang]);
 
   const stopListening = useCallback(() => {
-    activeRef.current = false;
+    console.log('[VoiceSearch] stopListening called');
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
     if (recognitionRef.current) {
       try {
+        console.log('[VoiceSearch] Calling recognition.stop()');
         recognitionRef.current.stop();
-      } catch (_e) {
-        // ignore
+      } catch (e) {
+        console.log('[VoiceSearch] stop() error:', e);
       }
     }
   }, []);
