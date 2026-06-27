@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import { Mic, AlertCircle } from 'lucide-react';
 import { useVoiceSearch } from '../hooks/useVoiceSearch';
 import { useSearchStore } from '../store/useSearchStore';
@@ -11,7 +11,6 @@ export function VoiceSearchButton() {
 
   const { isListening, isSupported, transcript, error, startListening, stopListening } = useVoiceSearch({
     onResult: useCallback((text) => {
-      console.log('[VoiceSearchButton] onResult:', text);
       setQuery(text);
       performSearch(text);
     }, [setQuery, performSearch]),
@@ -19,14 +18,12 @@ export function VoiceSearchButton() {
   });
 
   const handleStart = useCallback(() => {
-    console.log('[VoiceSearchButton] handleStart, isHolding:', isHoldingRef.current);
     if (isHoldingRef.current) return;
     isHoldingRef.current = true;
     startListening();
   }, [startListening]);
 
   const handleStop = useCallback(() => {
-    console.log('[VoiceSearchButton] handleStop, isHolding:', isHoldingRef.current);
     if (!isHoldingRef.current) return;
     isHoldingRef.current = false;
     stopListening();
@@ -49,29 +46,32 @@ export function VoiceSearchButton() {
   }, [handleStop]);
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
-    console.log('[VoiceSearchButton] touchStart');
     e.stopPropagation();
     handleStart();
   }, [handleStart]);
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
-    console.log('[VoiceSearchButton] mouseDown');
     e.stopPropagation();
     handleStart();
   }, [handleStart]);
 
   if (!isSupported) {
-    console.log('[VoiceSearchButton] Not supported, returning null');
-    return null;
+    return (
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 sm:hidden">
+        <div className="px-4 py-2 rounded-xl text-sm bg-amber-500 text-white text-center shadow-lg">
+          Voice not supported on this browser
+        </div>
+      </div>
+    );
   }
 
-  const showIndicator = isListening || error;
+  const showIndicator = isListening || error || transcript;
 
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 sm:hidden">
       {showIndicator && (
         <div className={cn(
-          "px-4 py-2 rounded-xl text-sm max-w-xs text-center shadow-lg",
+          "px-4 py-2 rounded-xl text-sm max-w-xs text-center shadow-lg min-h-[40px] flex items-center justify-center",
           error ? "bg-red-500 text-white" : "bg-slate-900 text-white"
         )}>
           {error ? (
@@ -79,8 +79,10 @@ export function VoiceSearchButton() {
               <AlertCircle size={14} />
               {error}
             </span>
+          ) : transcript ? (
+            <span className="font-medium">{transcript}</span>
           ) : (
-            transcript || "Listening..."
+            <span>Listening... speak now</span>
           )}
         </div>
       )}

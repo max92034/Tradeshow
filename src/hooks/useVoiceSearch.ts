@@ -64,7 +64,6 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
   useEffect(() => {
     if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
       setIsSupported(true);
-      console.log('[VoiceSearch] Speech recognition supported');
     }
   }, []);
 
@@ -82,22 +81,14 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
   }, []);
 
   const startListening = useCallback(() => {
-    console.log('[VoiceSearch] startListening called, isSupported:', isSupported);
-
-    if (!isSupported) {
-      console.log('[VoiceSearch] Not supported');
-      return;
-    }
+    if (!isSupported) return;
 
     const SpeechRecognitionCtor = (window as unknown as {
       SpeechRecognition?: new () => SpeechRecognition;
       webkitSpeechRecognition?: new () => SpeechRecognition;
     }).SpeechRecognition || (window as unknown as { webkitSpeechRecognition: new () => SpeechRecognition }).webkitSpeechRecognition;
 
-    if (!SpeechRecognitionCtor) {
-      console.log('[VoiceSearch] Constructor not found');
-      return;
-    }
+    if (!SpeechRecognitionCtor) return;
 
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -114,9 +105,17 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
     let interimTranscript = '';
 
     recognition.onstart = () => {
-      console.log('[VoiceSearch] Recognition started');
       setIsListening(true);
       setError(null);
+
+      // Auto-stop after 5 seconds of silence as fallback
+      timeoutRef.current = setTimeout(() => {
+        if (recognitionRef.current) {
+          try {
+            recognitionRef.current.stop();
+          } catch (_e) { /* ignore */ }
+        }
+      }, 5000);
     };
 
     recognition.onresult = (event: unknown) => {
@@ -128,19 +127,19 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
         const t = e.results[i][0].transcript;
         if (e.results[i].isFinal) {
           finalTranscript += t;
-          console.log('[VoiceSearch] Final result:', t);
         } else {
           interimTranscript += t;
-          console.log('[VoiceSearch] Interim result:', t);
         }
       }
 
       const displayText = finalTranscript + interimTranscript;
       setTranscript(displayText);
 
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      // Reset timeout on new speech
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
       timeoutRef.current = setTimeout(() => {
-        console.log('[VoiceSearch] Timeout reached, finalizing');
         if (recognitionRef.current) {
           try {
             recognitionRef.current.stop();
@@ -152,23 +151,23 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
     recognition.onerror = (event: unknown) => {
       const err = event as { error?: string };
       const errorCode = err.error || 'unknown';
-      console.log('[VoiceSearch] Error:', errorCode);
 
       if (errorCode === 'aborted') {
         return;
       }
 
       if (errorCode === 'no-speech') {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-        }
         return;
+      }
+
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
 
       if (errorCode === 'not-allowed' || errorCode === 'service-not-allowed') {
         setError('Microphone denied - check browser permissions');
       } else if (errorCode === 'network') {
-        setError('Network error');
+        setError('Network error - check internet');
       } else if (errorCode === 'audio-capture') {
         setError('No microphone found');
       } else {
@@ -177,27 +176,30 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
 
       setIsListening(false);
       setTranscript('');
+      recognitionRef.current = null;
     };
 
     recognition.onend = () => {
-      console.log('[VoiceSearch] Recognition ended, final:', finalTranscript, 'interim:', interimTranscript);
       setIsListening(false);
-      recognitionRef.current = null;
+
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
 
       const text = (finalTranscript || interimTranscript).trim();
       setTranscript('');
 
       if (text) {
-        console.log('[VoiceSearch] Returning result:', text);
         onResultRef.current(text);
       }
+
+      recognitionRef.current = null;
     };
 
     try {
-      console.log('[VoiceSearch] Calling recognition.start()');
       recognition.start();
     } catch (e) {
-      console.log('[VoiceSearch] Failed to start:', e);
       setIsListening(false);
       setError('Failed to start');
       recognitionRef.current = null;
@@ -205,18 +207,14 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
   }, [isSupported, lang]);
 
   const stopListening = useCallback(() => {
-    console.log('[VoiceSearch] stopListening called');
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
     if (recognitionRef.current) {
       try {
-        console.log('[VoiceSearch] Calling recognition.stop()');
         recognitionRef.current.stop();
-      } catch (e) {
-        console.log('[VoiceSearch] stop() error:', e);
-      }
+      } catch (_e) { /* ignore */ }
     }
   }, []);
 
