@@ -52,14 +52,21 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
   const [isSupported, setIsSupported] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
+
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const resultRef = useRef('');
-  const interimRef = useRef('');
+  const activeRef = useRef(false);
+  const finalTextRef = useRef('');
+  const interimTextRef = useRef('');
   const onResultRef = useRef(onResult);
+  const langRef = useRef(lang);
 
   useEffect(() => {
     onResultRef.current = onResult;
   }, [onResult]);
+
+  useEffect(() => {
+    langRef.current = lang;
+  }, [lang]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
@@ -69,6 +76,7 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
 
   useEffect(() => {
     return () => {
+      activeRef.current = false;
       if (recognitionRef.current) {
         recognitionRef.current.onend = null;
         recognitionRef.current.onerror = null;
@@ -84,41 +92,25 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
     };
   }, []);
 
-  const startListening = useCallback(() => {
-    if (!isSupported) return;
-
-    const SpeechRecognitionCtor = (window as unknown as { 
+  const createRecognition = useCallback((): SpeechRecognition | null => {
+    const SpeechRecognitionCtor = (window as unknown as {
       SpeechRecognition?: new () => SpeechRecognition;
       webkitSpeechRecognition?: new () => SpeechRecognition;
     }).SpeechRecognition || (window as unknown as { webkitSpeechRecognition: new () => SpeechRecognition }).webkitSpeechRecognition;
 
-    if (!SpeechRecognitionCtor) return;
-
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.abort();
-      } catch (_e) {
-        // ignore
-      }
-      recognitionRef.current = null;
-    }
-
-    setError(null);
-    resultRef.current = '';
-    setTranscript('');
+    if (!SpeechRecognitionCtor) return null;
 
     const recognition = new SpeechRecognitionCtor();
-    recognition.lang = lang;
+    recognition.lang = langRef.current;
     recognition.interimResults = true;
-    recognition.continuous = true;
+    recognition.continuous = false;
     recognition.maxAlternatives = 1;
-    recognitionRef.current = recognition;
 
     recognition.onresult = (event: unknown) => {
       const e = event as { resultIndex: number; results: Array<Array<{ transcript: string }> & { isFinal: boolean }> };
       let interim = '';
       let finalChunk = '';
-      
+
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const t = e.results[i][0].transcript;
         if (e.results[i].isFinal) {
@@ -127,37 +119,74 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
           interim += t;
         }
       }
-      
-      if (finalChunk) {
-        resultRef.current += finalChunk;
-      }
-      interimRef.current = interim;
-      
-      setTranscript(resultRef.current + interim);
-    };
 
-    recognition.onend = () => {
-      const text = (resultRef.current + interimRef.current).trim();
-      setIsListening(false);
-      recognitionRef.current = null;
-      if (text) {
-        onResultRef.current(text);
+      if (finalChunk) {
+        finalTextRef.current += finalChunk;
       }
-      setTranscript('');
-      resultRef.current = '';
-      interimRef.current = '';
+      interimTextRef.current = interim;
+      setTranscript(finalTextRef.current + interim);
     };
 
     recognition.onerror = (event: unknown) => {
       const err = event as { error?: string };
-      if (err.error !== 'no-speech' && err.error !== 'aborted') {
-        setError(err.error || 'Unknown error');
+      const errorCode = err.error || 'unknown';
+
+      if (errorCode === 'aborted') {
+        return;
       }
+
+      if (errorCode === 'no-speech') {
+        if (activeRef.current) {
+          return;
+        }
+      }
+
+      if (errorCode === 'not-allowed' || errorCode === 'service-not-allowed') {
+        setError('Microphone permission denied');
+      } else if (errorCode === 'network') {
+        setError('Network error');
+      } else if (errorCode === 'audio-capture') {
+        setError('No microphone found');
+      } else if (errorCode !== 'no-speech') {
+        setError(errorCode);
+      }
+
       setIsListening(false);
       setTranscript('');
       recognitionRef.current = null;
-      resultRef.current = '';
-      interimRef.current = '';
+      finalTextRef.current = '';
+      interimTextRef.current = '';
+      activeRef.current = false;
+    };
+
+    recognition.onend = () => {
+      if (activeRef.current) {
+        const currentFinal = finalTextRef.current + interimTextRef.current;
+        if (currentFinal.trim()) {
+          finalTextRef.current = currentFinal.trim() + ' ';
+          interimTextRef.current = '';
+          setTranscript(finalTextRef.current);
+        }
+
+        try {
+          if (recognitionRef.current) {
+            recognitionRef.current.start();
+            return;
+          }
+        } catch (_e) {
+          // fall through to finalize
+        }
+      }
+
+      const text = (finalTextRef.current + interimTextRef.current).trim();
+      setIsListening(false);
+      setTranscript('');
+      recognitionRef.current = null;
+      finalTextRef.current = '';
+      interimTextRef.current = '';
+      if (text) {
+        onResultRef.current(text);
+      }
     };
 
     recognition.onstart = () => {
@@ -165,16 +194,39 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
       setError(null);
     };
 
+    return recognition;
+  }, []);
+
+  const startListening = useCallback(() => {
+    if (!isSupported || activeRef.current) return;
+
+    setError(null);
+    finalTextRef.current = '';
+    interimTextRef.current = '';
+    setTranscript('');
+    activeRef.current = true;
+
+    const recognition = createRecognition();
+    if (!recognition) {
+      activeRef.current = false;
+      setError('Speech recognition not supported');
+      return;
+    }
+
+    recognitionRef.current = recognition;
+
     try {
       recognition.start();
     } catch (_e) {
       setIsListening(false);
-      setError('Failed to start');
+      setError('Failed to start recognition');
       recognitionRef.current = null;
+      activeRef.current = false;
     }
-  }, [isSupported, lang]);
+  }, [isSupported, createRecognition]);
 
   const stopListening = useCallback(() => {
+    activeRef.current = false;
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
