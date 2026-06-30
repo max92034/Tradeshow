@@ -62,16 +62,19 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
     };
   }, []);
 
-  const sendAudioForTranscription = useCallback(async (audioBlob: Blob, mimeType: string) => {
+  const sendAudioForTranscription = useCallback(async (audioBlob: Blob) => {
     const apiUrl = getApiUrl();
+
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const base64 = btoa(
+      new Uint8Array(arrayBuffer)
+        .reduce((data, byte) => data + String.fromCharCode(byte), '')
+    );
 
     const response = await fetch(apiUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': mimeType,
-        'X-Language': lang,
-      },
-      body: audioBlob,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ audio: base64, language: lang }),
     });
 
     if (!response.ok) {
@@ -132,7 +135,7 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeTypeRef.current });
 
         try {
-          const text = await sendAudioForTranscription(audioBlob, mimeTypeRef.current || 'audio/webm');
+          const text = await sendAudioForTranscription(audioBlob);
           setTranscript(text);
           onResultRef.current(text);
         } catch (e) {
