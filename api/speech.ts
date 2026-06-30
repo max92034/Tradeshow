@@ -97,8 +97,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let transcript = result?.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
     const confidence = result?.results?.channels?.[0]?.alternatives?.[0]?.confidence || 0;
 
-    // Post-process: extract only digits and relevant characters for SKU numbers
-    // This handles cases where voice recognition adds extra words
+    // Extract only digits and relevant characters for SKU number search
+    // This applies to both English and Chinese
     const cleanedTranscript = transcript
       .replace(/[^\d\s\-_]/g, '') // Remove non-digits except spaces, hyphens, underscores
       .replace(/\s+/g, ' ')        // Normalize spaces
