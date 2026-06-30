@@ -23,7 +23,7 @@ function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Language');
   res.setHeader('Access-Control-Max-Age', '86400');
 }
 
@@ -47,24 +47,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { audio, language } = req.body;
+    const contentType = req.headers['content-type'] || '';
+    let language = (req.headers['x-language'] as string) || 'zh-CN';
 
-    if (!audio) {
-      return res.status(400).json({ error: 'No audio data provided' });
+    let audioBuffer: Buffer;
+    let audioMimeType: string;
+
+    if (contentType.includes('application/json')) {
+      const { audio, language: bodyLang } = req.body;
+      if (!audio) {
+        return res.status(400).json({ error: 'No audio data provided' });
+      }
+      audioBuffer = Buffer.from(audio, 'base64');
+      audioMimeType = 'audio/webm';
+      if (bodyLang) {
+        language = bodyLang;
+      }
+    } else {
+      audioBuffer = req.body as Buffer;
+      if (!audioBuffer || audioBuffer.length === 0) {
+        return res.status(400).json({ error: 'No audio data provided' });
+      }
+      audioMimeType = contentType || 'audio/webm';
     }
 
-    const lang = language || 'zh-CN';
-    const model = lang === 'zh-CN' ? 'nova-3' : 'nova-3';
-
-    const endpoint = `https://api.deepgram.com/v1/listen?model=${model}&language=${lang}&smart_format=true`;
+    const endpoint = `https://api.deepgram.com/v1/listen?model=nova-2&language=${language}&smart_format=false&punctuate=false&profanity_filter=false&detect_topics=false&diarize=false`;
 
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Authorization': `Token ${apiKey}`,
-        'Content-Type': 'audio/webm',
+        'Content-Type': audioMimeType,
       },
-      body: Buffer.from(audio, 'base64'),
+      body: audioBuffer,
     });
 
     if (!response.ok) {

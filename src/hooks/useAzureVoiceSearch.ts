@@ -17,15 +17,13 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
   const streamRef = useRef<MediaStream | null>(null);
   const pressedRef = useRef(false);
   const onResultRef = useRef(onResult);
+  const mimeTypeRef = useRef<string>('');
 
   useEffect(() => {
     onResultRef.current = onResult;
   }, [onResult]);
 
   useEffect(() => {
-    // MediaRecorder is supported in all modern browsers (Chrome, Edge, Firefox, Safari)
-    // We don't check for mediaDevices here because it might not be available during SSR/hydration
-    // The actual permission check happens in startListening()
     setIsSupported(true);
   }, []);
 
@@ -40,6 +38,22 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
     return '/api/speech';
   }
 
+  function getBestAudioMimeType(): string {
+    const types = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/ogg;codecs=opus',
+      'audio/ogg',
+      'audio/mp4',
+    ];
+    for (const type of types) {
+      if (MediaRecorder.isTypeSupported(type)) {
+        return type;
+      }
+    }
+    return '';
+  }
+
   useEffect(() => {
     return () => {
       if (streamRef.current) {
@@ -48,6 +62,34 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
     };
   }, []);
 
+  const sendAudioForTranscription = useCallback(async (audioBlob: Blob, mimeType: string) => {
+    const apiUrl = getApiUrl();
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': mimeType,
+        'X-Language': lang,
+      },
+      body: audioBlob,
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || `Server error: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (result.error) {
+      throw new Error(result.error);
+    } else if (result.text) {
+      return result.text;
+    } else {
+      throw new Error('No speech recognized - try speaking closer to the mic');
+    }
+  }, [lang]);
+
   const startListening = useCallback(async () => {
     setError(null);
     setTranscript('');
@@ -55,16 +97,24 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
     audioChunksRef.current = [];
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 16000,
+          channelCount: 1,
+        },
+      });
       streamRef.current = stream;
 
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/webm')
-          ? 'audio/webm'
-          : 'audio/ogg';
+      const mimeType = getBestAudioMimeType();
+      mimeTypeRef.current = mimeType;
 
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const recorder = new MediaRecorder(stream, {
+        mimeType: mimeType || undefined,
+        audioBitsPerSecond: 24000,
+      });
       mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (e) => {
@@ -74,39 +124,15 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
       };
 
       recorder.onstop = async () => {
-        setIsProcessing(true);
         setIsListening(false);
+        setIsProcessing(true);
 
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeTypeRef.current });
 
         try {
-          const arrayBuffer = await audioBlob.arrayBuffer();
-          const base64 = btoa(
-            new Uint8Array(arrayBuffer)
-              .reduce((data, byte) => data + String.fromCharCode(byte), '')
-          );
-
-          const response = await fetch(getApiUrl(), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ audio: base64, language: lang }),
-          });
-
-          if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            throw new Error(errData.error || `Server error: ${response.status}`);
-          }
-
-          const result = await response.json();
-
-          if (result.error) {
-            setError(result.error);
-          } else if (result.text) {
-            setTranscript(result.text);
-            onResultRef.current(result.text);
-          } else {
-            setError('No speech recognized - try speaking closer to the mic');
-          }
+          const text = await sendAudioForTranscription(audioBlob, mimeTypeRef.current || 'audio/webm');
+          setTranscript(text);
+          onResultRef.current(text);
         } catch (e) {
           const msg = e instanceof Error ? e.message : 'Transcription failed';
           setError(msg);
@@ -116,7 +142,7 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
         }
       };
 
-      recorder.start(100);
+      recorder.start(250);
       setIsListening(true);
     } catch (e) {
       const err = e as Error | DOMException;
@@ -132,7 +158,7 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
         streamRef.current = null;
       }
     }
-  }, [lang]);
+  }, [sendAudioForTranscription]);
 
   const stopListening = useCallback(() => {
     pressedRef.current = false;
