@@ -21,6 +21,12 @@ export function VoiceSearchButton() {
     if (pressedRef.current) return;
     pressedRef.current = true;
     setPressed(true);
+
+    // Blur any focused input to prevent keyboard from popping up on mobile
+    if (document.activeElement && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+
     startListening();
   }, [startListening]);
 
@@ -84,6 +90,7 @@ export function VoiceSearchButton() {
         </div>
       )}
       <button
+        type="button"
         onPointerDown={onPointerDown}
         className={cn(
           "w-20 h-20 rounded-full flex items-center justify-center shadow-2xl transition-transform select-none touch-none relative",
