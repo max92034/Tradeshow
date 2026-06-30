@@ -73,13 +73,7 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
         .reduce((data, byte) => data + String.fromCharCode(byte), '')
     );
 
-    // Use explicit lang if provided, otherwise use settings store preference
-    const effectiveLang = lang || (voiceLanguage !== 'auto' ? voiceLanguage : undefined);
-
-    const payload: { audio: string; language?: string } = { audio: base64 };
-    if (effectiveLang) {
-      payload.language = effectiveLang;
-    }
+    const payload = { audio: base64, language: lang || voiceLanguage };
 
     const response = await fetch(apiUrl, {
       method: 'POST',

@@ -65,75 +65,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Audio data is empty' });
     }
 
-    // Build request headers
-    const headers = {
-      'Authorization': `Token ${apiKey}`,
-      'Content-Type': 'audio/webm',
-    };
+    // Use the specified language, default to Chinese
+    const lang = language === 'en' ? 'en' : 'zh';
 
-    // Helper to call Deepgram with a specific language
-    const transcribeWithLanguage = async (lang: string): Promise<{ transcript: string; confidence: number }> => {
-      const endpoint = `https://api.deepgram.com/v1/listen?model=nova-3&language=${lang}&smart_format=true&punctuate=true`;
+    const endpoint = `https://api.deepgram.com/v1/listen?model=nova-3&language=${lang}&smart_format=true&punctuate=true`;
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: audioBuffer,
-      });
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${apiKey}`,
+        'Content-Type': 'audio/webm',
+      },
+      body: audioBuffer,
+    });
 
-      if (!response.ok) {
-        throw new Error(`Deepgram error: ${response.status}`);
-      }
-
-      const result = await response.json();
-      const transcript = result?.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
-      const confidence = result?.results?.channels?.[0]?.alternatives?.[0]?.confidence || 0;
-
-      return { transcript: transcript.trim(), confidence };
-    };
-
-    let finalTranscript = '';
-    let finalConfidence = 0;
-
-    if (language === 'en') {
-      // English only mode
-      const result = await transcribeWithLanguage('en');
-      finalTranscript = result.transcript;
-      finalConfidence = result.confidence;
-    } else if (language === 'zh-CN' || language === 'zh') {
-      // Chinese only mode
-      const result = await transcribeWithLanguage('zh');
-      finalTranscript = result.transcript;
-      finalConfidence = result.confidence;
-    } else {
-      // Auto mode: run both English and Chinese in parallel, pick the best result
-      const [enResult, zhResult] = await Promise.all([
-        transcribeWithLanguage('en'),
-        transcribeWithLanguage('zh'),
-      ]);
-
-      // Pick the result with higher confidence and non-empty transcript
-      if (enResult.transcript && zhResult.transcript) {
-        // Both have results - pick the one with higher confidence
-        if (enResult.confidence >= zhResult.confidence) {
-          finalTranscript = enResult.transcript;
-          finalConfidence = enResult.confidence;
-        } else {
-          finalTranscript = zhResult.transcript;
-          finalConfidence = zhResult.confidence;
-        }
-      } else if (enResult.transcript) {
-        finalTranscript = enResult.transcript;
-        finalConfidence = enResult.confidence;
-      } else if (zhResult.transcript) {
-        finalTranscript = zhResult.transcript;
-        finalConfidence = zhResult.confidence;
-      }
-      // If neither has results, return empty
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Deepgram error:', response.status, errorText);
+      return res.status(response.status).json({ error: `Deepgram error: ${response.status}` });
     }
 
-    if (finalTranscript.length > 0) {
-      return res.status(200).json({ text: finalTranscript, confidence: finalConfidence });
+    const result = await response.json();
+    const transcript = result?.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
+    const confidence = result?.results?.channels?.[0]?.alternatives?.[0]?.confidence || 0;
+
+    const trimmed = transcript.trim();
+    if (trimmed.length > 0) {
+      return res.status(200).json({ text: trimmed, confidence });
     } else {
       return res.status(200).json({
         text: '',

@@ -1,9 +1,10 @@
-import React, { useRef, useEffect, useCallback } from 'react';
-import { Search, Mic, ScanLine, Upload, ShoppingCart, History, X, Settings } from 'lucide-react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
+import { Search, Mic, ScanLine, Upload, ShoppingCart, History, X, Settings, Menu } from 'lucide-react';
 import { useSearchStore } from '../store/useSearchStore';
 import { useOrderStore } from '../store/useOrderStore';
 import { useVoiceSearch } from '../hooks/useAzureVoiceSearch';
 import { useDebounce } from '../hooks/useDebounce';
+import { useSettingsStore } from '../store/useSettingsStore';
 import { cn } from '../lib/utils';
 
 interface SearchHeaderProps {
@@ -20,8 +21,12 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
   
   const totalItems = useOrderStore(state => state.currentOrder.totalItems);
   const toggleDrawer = useOrderStore(state => state.toggleDrawer);
+  const voiceLanguage = useSettingsStore(state => state.voiceLanguage);
+  const toggleVoiceLanguage = useSettingsStore(state => state.toggleVoiceLanguage);
   
   const inputRef = useRef<HTMLInputElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const { isListening, isSupported: voiceSupported, startListening, stopListening } = useVoiceSearch({
     onResult: useCallback((text) => {
@@ -41,6 +46,20 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
   useEffect(() => {
     performSearch(debouncedQuery);
   }, [debouncedQuery, performSearch]);
+
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    if (menuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [menuOpen]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setQuery(e.target.value);
@@ -115,7 +134,7 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
             
             <button
               onClick={onHistoryClick}
-              className="p-2 sm:p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all"
+              className="p-2 sm:p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all hidden sm:block"
               title="Order history"
             >
               <History size={20} />
@@ -123,11 +142,99 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
             
             <button
               onClick={onUploadClick}
-              className="p-2 sm:p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all"
+              className="p-2 sm:p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all hidden sm:block"
               title="Upload products"
             >
               <Upload size={20} />
             </button>
+
+            <div className="relative sm:hidden" ref={menuRef}>
+              <button
+                onClick={() => setMenuOpen(!menuOpen)}
+                className={cn(
+                  "p-2 rounded-xl transition-all",
+                  menuOpen ? "bg-slate-800 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"
+                )}
+                title="Menu"
+              >
+                {menuOpen ? <X size={20} /> : <Menu size={20} />}
+              </button>
+
+              <div
+                className={cn(
+                  "absolute right-0 top-12 w-56 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 overflow-hidden z-50",
+                  "transition-all duration-200 origin-top-right",
+                  menuOpen ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"
+                )}
+              >
+                <button
+                  onClick={() => {
+                    onSettingsClick();
+                    closeMenu();
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-all"
+                >
+                  <Settings size={18} />
+                  <div className="flex-1 text-left">
+                    <div className="font-medium text-sm">Settings</div>
+                    <div className="text-xs text-slate-500">设置</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    toggleVoiceLanguage();
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-all border-t border-slate-700"
+                >
+                  <Mic size={18} />
+                  <div className="flex-1 text-left">
+                    <div className="font-medium text-sm">
+                      Voice: {voiceLanguage === 'zh-CN' ? '中文' : 'English'}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      Tap to switch / 点击切换
+                    </div>
+                  </div>
+                  <div className={cn(
+                    "px-2 py-0.5 rounded text-xs font-bold",
+                    voiceLanguage === 'zh-CN' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'
+                  )}>
+                    {voiceLanguage === 'zh-CN' ? '中' : 'EN'}
+                  </div>
+                </button>
+
+                <div className="border-t border-slate-700">
+                  <button
+                    onClick={() => {
+                      onHistoryClick();
+                      closeMenu();
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-all"
+                  >
+                    <History size={18} />
+                    <div className="flex-1 text-left">
+                      <div className="font-medium text-sm">Order History</div>
+                      <div className="text-xs text-slate-500">订单历史</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      onUploadClick();
+                      closeMenu();
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-all"
+                  >
+                    <Upload size={18} />
+                    <div className="flex-1 text-left">
+                      <div className="font-medium text-sm">Upload Products</div>
+                      <div className="text-xs text-slate-500">上传产品</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
             
             <button
               onClick={() => toggleDrawer(true)}
