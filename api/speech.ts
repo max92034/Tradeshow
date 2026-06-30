@@ -53,14 +53,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'No audio data provided' });
     }
 
-    // Build API endpoint with automatic language detection
-    // If language is specified, use it; otherwise, let Deepgram auto-detect
+    // Supported languages - limit to English and Chinese for this app
+    const SUPPORTED_LANGUAGES = ['en', 'zh-CN', 'zh'];
+    const isLanguageAllowed = (lang: string) =>
+      SUPPORTED_LANGUAGES.some(supported =>
+        lang.toLowerCase().startsWith(supported.toLowerCase())
+      );
+
+    // Build API endpoint
     let endpoint = 'https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true';
-    
-    if (language) {
-      endpoint += `&language=${language}`;
+
+    if (language && language !== 'auto') {
+      // Use the specified language if it's in our supported list
+      if (isLanguageAllowed(language)) {
+        endpoint += `&language=${language}`;
+      } else {
+        // Fallback to auto-detect if unsupported language requested
+        endpoint += '&detect_language=true';
+      }
     } else {
-      // Automatic language detection - works for English, Chinese, and 50+ other languages
+      // Auto-detect language
       endpoint += '&detect_language=true';
     }
 
@@ -80,11 +92,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const result = await response.json();
-    const transcript = result?.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
+    let transcript = result?.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
     const confidence = result?.results?.channels?.[0]?.alternatives?.[0]?.confidence || 0;
 
+    // If auto-detected language is not English or Chinese, return empty result
+    // This limits the app to only English and Chinese voice input
+    const detectedLanguage = result?.results?.channels?.[0]?.detected_language;
+    if (detectedLanguage && !isLanguageAllowed(detectedLanguage)) {
+      transcript = '';
+    }
+
     if (transcript) {
-      return res.status(200).json({ text: transcript, confidence });
+      return res.status(200).json({ text: transcript, confidence, detectedLanguage });
     } else {
       return res.status(200).json({ 
         text: '',

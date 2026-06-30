@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback } from 'react';
-import { Search, Mic, ScanLine, Upload, ShoppingCart, History, X } from 'lucide-react';
+import { Search, Mic, ScanLine, Upload, ShoppingCart, History, X, Settings } from 'lucide-react';
 import { useSearchStore } from '../store/useSearchStore';
 import { useOrderStore } from '../store/useOrderStore';
 import { useVoiceSearch } from '../hooks/useAzureVoiceSearch';
@@ -9,9 +9,10 @@ import { cn } from '../lib/utils';
 interface SearchHeaderProps {
   onUploadClick: () => void;
   onHistoryClick: () => void;
+  onSettingsClick: () => void;
 }
 
-export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, onHistoryClick }: SearchHeaderProps) {
+export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, onHistoryClick, onSettingsClick }: SearchHeaderProps) {
   const query = useSearchStore(state => state.query);
   const setQuery = useSearchStore(state => state.setQuery);
   const performSearch = useSearchStore(state => state.performSearch);
@@ -104,6 +105,14 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
           </div>
           
           <div className="flex items-center gap-1 sm:gap-2">
+            <button
+              onClick={onSettingsClick}
+              className="p-2 sm:p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all hidden sm:block"
+              title="Settings"
+            >
+              <Settings size={20} />
+            </button>
+            
             <button
               onClick={onHistoryClick}
               className="p-2 sm:p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all"

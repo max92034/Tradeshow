@@ -4,6 +4,7 @@ import { ResultsGrid } from '@/components/ResultsGrid';
 import { UploadModal } from '@/components/UploadModal';
 import { OrderDrawer } from '@/components/OrderDrawer';
 import { OrderHistoryModal } from '@/components/OrderHistoryModal';
+import { SettingsModal } from '@/components/SettingsModal';
 import { VoiceSearchButton } from '@/components/VoiceSearchButton';
 import { useSearchStore } from '@/store/useSearchStore';
 import { useProductStore } from '@/store/useProductStore';
@@ -13,6 +14,7 @@ import { Package, Upload as UploadIcon, Sparkles } from 'lucide-react';
 export default function Home() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const results = useSearchStore(state => state.results);
   const query = useSearchStore(state => state.query);
   const isLoaded = useProductStore(state => state.isLoaded);
@@ -38,6 +40,7 @@ export default function Home() {
       <SearchHeader
         onUploadClick={() => setUploadOpen(true)}
         onHistoryClick={() => setHistoryOpen(true)}
+        onSettingsClick={() => setSettingsOpen(true)}
       />
       
       <main className="px-3 sm:px-6 py-4 sm:py-6 pb-28 sm:pb-6">
@@ -98,6 +101,7 @@ export default function Home() {
       <UploadModal isOpen={uploadOpen} onClose={() => setUploadOpen(false)} />
       <OrderDrawer isOpen={isDrawerOpen} onClose={() => toggleDrawer(false)} />
       <OrderHistoryModal isOpen={historyOpen} onClose={() => setHistoryOpen(false)} />
+      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <VoiceSearchButton />
     </div>
   );

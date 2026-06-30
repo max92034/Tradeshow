@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { useSettingsStore } from '../store/useSettingsStore';
 
 interface UseVoiceSearchOptions {
   onResult: (text: string) => void;
-  lang?: string; // Optional - if not provided, Deepgram will auto-detect language
+  lang?: string; // Optional - if not provided, uses settings store preference
 }
 
 export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
@@ -64,6 +65,7 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
 
   const sendAudioForTranscription = useCallback(async (audioBlob: Blob) => {
     const apiUrl = getApiUrl();
+    const voiceLanguage = useSettingsStore.getState().voiceLanguage;
 
     const arrayBuffer = await audioBlob.arrayBuffer();
     const base64 = btoa(
@@ -71,10 +73,12 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
         .reduce((data, byte) => data + String.fromCharCode(byte), '')
     );
 
-    // Send language only if specified; otherwise Deepgram auto-detects
+    // Use explicit lang if provided, otherwise use settings store preference
+    const effectiveLang = lang || (voiceLanguage !== 'auto' ? voiceLanguage : undefined);
+
     const payload: { audio: string; language?: string } = { audio: base64 };
-    if (lang) {
-      payload.language = lang;
+    if (effectiveLang) {
+      payload.language = effectiveLang;
     }
 
     const response = await fetch(apiUrl, {
