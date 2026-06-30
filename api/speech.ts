@@ -55,7 +55,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const lang = language || 'zh-CN';
 
-    const endpoint = `https://api.deepgram.com/v1/listen?model=nova-2&language=${lang}&smart_format=false&punctuate=false&profanity_filter=false&detect_topics=false&diarize=false`;
+    // Use nova-3 for best accuracy, smart_format for better output
+    const endpoint = `https://api.deepgram.com/v1/listen?model=nova-3&language=${lang}&smart_format=true`;
 
     const response = await fetch(endpoint, {
       method: 'POST',

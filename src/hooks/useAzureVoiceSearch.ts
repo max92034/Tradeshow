@@ -116,8 +116,8 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
       if (mimeType) {
         recorderOptions.mimeType = mimeType;
       }
-      // Use 48kbps - reliable and still much smaller than default 128kbps
-      recorderOptions.audioBitsPerSecond = 48000;
+      // Use higher bitrate for better recognition accuracy
+      recorderOptions.audioBitsPerSecond = 128000;
 
       const recorder = new MediaRecorder(stream, recorderOptions);
       mediaRecorderRef.current = recorder;
