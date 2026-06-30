@@ -47,7 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { audio, language } = req.body;
+    const { audio, language, mimeType } = req.body;
 
     if (!audio) {
       return res.status(400).json({ error: 'No audio data provided' });
@@ -65,6 +65,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Audio data is empty' });
     }
 
+    if (audioBuffer.length < 100) {
+      return res.status(400).json({ error: 'Audio too short - record for at least 1 second' });
+    }
+
+    // Determine content type from mimeType or default
+    const contentType = mimeType || 'audio/webm';
+
     // Use the specified language, default to Chinese
     const lang = language === 'en' ? 'en' : 'zh';
 
@@ -74,7 +81,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       method: 'POST',
       headers: {
         'Authorization': `Token ${apiKey}`,
-        'Content-Type': 'audio/webm',
+        'Content-Type': contentType,
       },
       body: audioBuffer,
     });

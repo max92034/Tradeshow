@@ -1,6 +1,5 @@
 import React from 'react';
-import { X, Settings as SettingsIcon, Mic } from 'lucide-react';
-import { useSettingsStore, VoiceLanguage } from '../store/useSettingsStore';
+import { X, Settings as SettingsIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface SettingsModalProps {
@@ -9,10 +8,6 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
-  const voiceLanguage = useSettingsStore(state => state.voiceLanguage);
-  const setVoiceLanguage = useSettingsStore(state => state.setVoiceLanguage);
-  const toggleVoiceLanguage = useSettingsStore(state => state.toggleVoiceLanguage);
-
   return (
     <>
       <div
@@ -27,7 +22,7 @@ export const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose
         className={cn(
           "fixed z-50 bg-white shadow-2xl flex flex-col transition-all duration-300 ease-out rounded-2xl",
           "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
-          "w-[90vw] max-w-sm max-h-[85vh]",
+          "w-[90vw] max-w-sm",
           isOpen ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"
         )}
       >
@@ -49,52 +44,10 @@ export const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose
           </button>
         </div>
 
-        <div className="p-5 space-y-5">
-          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
-            <div className="flex items-center gap-3">
-              <Mic size={20} className="text-cyan-600" />
-              <div>
-                <div className="font-semibold text-slate-800 text-sm">Voice Language</div>
-                <div className="text-xs text-slate-500">语音识别语言</div>
-              </div>
-            </div>
-
-            <button
-              onClick={toggleVoiceLanguage}
-              className={cn(
-                "relative w-14 h-8 rounded-full transition-all duration-300",
-                "focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2",
-                voiceLanguage === 'zh-CN' ? 'bg-red-500' : 'bg-blue-500'
-              )}
-              aria-label="Toggle voice language"
-            >
-              <div
-                className={cn(
-                  "absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 flex items-center justify-center text-xs font-bold",
-                  voiceLanguage === 'zh-CN' ? 'left-7' : 'left-1'
-                )}
-              >
-                {voiceLanguage === 'zh-CN' ? '中' : 'A'}
-              </div>
-            </button>
-          </div>
-
-          <div className="text-center text-sm text-slate-600">
-            {voiceLanguage === 'zh-CN' ? (
-              <span>当前: <span className="font-semibold text-red-600">中文</span></span>
-            ) : (
-              <span>Current: <span className="font-semibold text-blue-600">English</span></span>
-            )}
-          </div>
-
-          <div className="pt-2 border-t border-slate-100">
-            <button
-              onClick={() => setVoiceLanguage(voiceLanguage === 'zh-CN' ? 'en' : 'zh-CN')}
-              className="w-full py-3 text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl text-sm font-medium transition-all"
-            >
-              切换到 {voiceLanguage === 'zh-CN' ? 'English' : '中文'}
-            </button>
-          </div>
+        <div className="p-5 text-center text-slate-500 text-sm">
+          Voice language can be toggled from the mobile menu.
+          <br />
+          <span className="text-xs">语音语言可在菜单中切换</span>
         </div>
 
         <div className="p-4 border-t border-slate-200 flex justify-end">

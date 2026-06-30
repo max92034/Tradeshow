@@ -40,18 +40,20 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
   }
 
   function getBestAudioMimeType(): string {
+    // iOS Safari prefers MP4/AAC, Chrome/Android prefers WebM/Opus
     const types = [
-      'audio/webm;codecs=opus',
+      'audio/mp4',           // iOS Safari (AAC)
+      'audio/webm;codecs=opus', // Chrome/Android
       'audio/webm',
       'audio/ogg;codecs=opus',
       'audio/ogg',
-      'audio/mp4',
     ];
     for (const type of types) {
       if (MediaRecorder.isTypeSupported(type)) {
         return type;
       }
     }
+    // Fallback - let browser choose
     return '';
   }
 
@@ -63,17 +65,29 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
     };
   }, []);
 
-  const sendAudioForTranscription = useCallback(async (audioBlob: Blob) => {
+  const sendAudioForTranscription = useCallback(async (audioBlob: Blob, mimeType?: string) => {
     const apiUrl = getApiUrl();
     const voiceLanguage = useSettingsStore.getState().voiceLanguage;
 
     const arrayBuffer = await audioBlob.arrayBuffer();
+
+    // Check for large audio files - split into chunks if needed
+    if (arrayBuffer.byteLength > 10 * 1024 * 1024) {
+      throw new Error('Audio too large - try recording shorter');
+    }
+
+    // Convert to base64
     const base64 = btoa(
       new Uint8Array(arrayBuffer)
         .reduce((data, byte) => data + String.fromCharCode(byte), '')
     );
 
-    const payload = { audio: base64, language: lang || voiceLanguage };
+    // Include mime type so API knows the format
+    const payload = {
+      audio: base64,
+      language: lang || voiceLanguage,
+      mimeType: mimeType || 'audio/webm'
+    };
 
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -136,10 +150,25 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
         setIsListening(false);
         setIsProcessing(true);
 
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeTypeRef.current });
+        // Check if we have audio data
+        if (audioChunksRef.current.length === 0) {
+          setError('No audio recorded - try holding longer');
+          setIsProcessing(false);
+          return;
+        }
+
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeTypeRef.current || 'audio/webm' });
+
+        // Check if audio blob is too small (likely empty or corrupted)
+        if (audioBlob.size < 100) {
+          setError('Audio too short - try speaking longer');
+          setIsProcessing(false);
+          audioChunksRef.current = [];
+          return;
+        }
 
         try {
-          const text = await sendAudioForTranscription(audioBlob);
+          const text = await sendAudioForTranscription(audioBlob, mimeTypeRef.current);
           setTranscript(text);
           onResultRef.current(text);
         } catch (e) {
