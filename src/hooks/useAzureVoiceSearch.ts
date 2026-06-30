@@ -29,6 +29,17 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
     setIsSupported(true);
   }, []);
 
+  function getApiUrl(): string {
+    if (typeof window === 'undefined') return '/api/speech';
+    const host = window.location.hostname;
+    const vercelApiUrl = import.meta.env.VITE_VERCEL_API_URL;
+    if (vercelApiUrl) return vercelApiUrl + '/api/speech';
+    if (host.endsWith('github.io') || host === 'localhost') {
+      return 'https://tradeshow-sigma.vercel.app/api/speech';
+    }
+    return '/api/speech';
+  }
+
   useEffect(() => {
     return () => {
       if (streamRef.current) {
@@ -75,8 +86,7 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
               .reduce((data, byte) => data + String.fromCharCode(byte), '')
           );
 
-          const apiBase = typeof window !== 'undefined' ? window.location.origin : '';
-          const response = await fetch(`${apiBase}/api/speech`, {
+          const response = await fetch(getApiUrl(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ audio: base64, language: lang }),

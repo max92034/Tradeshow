@@ -10,7 +10,30 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
+const ALLOWED_ORIGINS = [
+  /^https:\/\/.*\.vercel\.app$/,
+  /^https:\/\/max92034\.github\.io$/,
+  /^http:\/\/localhost:\d+$/,
+];
+
+function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
+  const origin = req.headers.origin || '';
+  const isAllowed = ALLOWED_ORIGINS.some(pattern => pattern.test(origin));
+  if (isAllowed) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Max-Age', '86400');
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  setCorsHeaders(req, res);
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

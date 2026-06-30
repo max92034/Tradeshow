@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useCallback } from 'react';
 import { Search, Mic, ScanLine, Upload, ShoppingCart, History, X } from 'lucide-react';
 import { useSearchStore } from '../store/useSearchStore';
 import { useOrderStore } from '../store/useOrderStore';
-import { useVoiceSearch } from '../hooks/useVoiceSearch';
+import { useVoiceSearch } from '../hooks/useAzureVoiceSearch';
 import { useDebounce } from '../hooks/useDebounce';
 import { cn } from '../lib/utils';
 
