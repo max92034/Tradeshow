@@ -76,19 +76,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const lang = language === 'en' ? 'en' : 'zh';
 
     // Keyterm prompting boosts recognition accuracy for important terms.
-    // For Chinese SKU search, we boost the Chinese digit words so they
-    // are recognized more reliably when users say "七七一二三" (77123).
-    // For English, we boost the spelled-out digits.
+    // Since we only want number recognition, we heavily boost ALL digit patterns
+    // so the model strongly prefers number words over similar-sounding characters.
+    const zhDigits = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
     const keyterms: string[] = lang === 'zh'
       ? [
-          '零', '一', '二', '三', '四', '五', '六', '七', '八', '九',
+          ...zhDigits,
+          ...zhDigits.map(d => d + d),
+          '零一', '零二', '零三', '零四', '零五', '零六', '零七', '零八', '零九',
+          '一零', '二零', '三零', '四零', '五零', '六零', '七零', '八零', '九零',
+          '一二', '二三', '三四', '四五', '五六', '六七', '七八', '八九',
+          '二一', '三二', '四三', '五四', '六五', '七六', '八七', '九八',
+          '零一二', '一二三', '二三四', '三四五', '四五六', '五六七', '六七八', '七八九', '八九零',
           '零一二三', '一二三四', '二三四五', '三四五六', '四五六七',
           '五六七八', '六七八九', '七八九零', '八九零一', '九零一二',
-          '一零', '二一', '三二', '四三', '五四', '六五', '七六', '八七', '九八',
+          '一百', '一千', '一万', '号码', '编号',
         ]
       : [
           'zero', 'one', 'two', 'three', 'four', 'five',
           'six', 'seven', 'eight', 'nine',
+          'oh', 'double', 'triple',
+          'zero zero', 'one one', 'two two', 'three three', 'four four',
+          'five five', 'six six', 'seven seven', 'eight eight', 'nine nine',
         ];
 
     const keytermParams = keyterms
@@ -119,18 +128,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const confidence = result?.results?.channels?.[0]?.alternatives?.[0]?.confidence || 0;
 
     // Extract only digits and hyphens/underscores for SKU number search
-    // This applies to both English and Chinese
+    // This applies to both English and Chinese - ONLY numbers are returned
     const cleanedTranscript = transcript
-      .replace(/[^\d\-_]/g, '') // Remove non-digits except hyphens and underscores
+      .replace(/[^\d\-_]/g, '')
       .trim();
 
-    const trimmed = cleanedTranscript || transcript.trim();
-    if (trimmed.length > 0) {
-      return res.status(200).json({ text: trimmed, confidence });
+    if (cleanedTranscript.length > 0) {
+      return res.status(200).json({ text: cleanedTranscript, confidence });
     } else {
       return res.status(200).json({
         text: '',
-        error: 'No speech recognized - try speaking closer to the mic',
+        error: 'Only numbers are recognized. Please speak digits 0-9.',
       });
     }
   } catch (error) {
