@@ -75,8 +75,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Use the specified language, default to Chinese
     const lang = language === 'en' ? 'en' : 'zh';
 
-    // numerals=true helps Deepgram recognize spoken numbers better
-    const endpoint = `https://api.deepgram.com/v1/listen?model=nova-3&language=${lang}&smart_format=true&punctuate=true&numerals=true`;
+    // Keyterm prompting boosts recognition accuracy for important terms.
+    // For Chinese SKU search, we boost the Chinese digit words so they
+    // are recognized more reliably when users say "七七一二三" (77123).
+    // For English, we boost the spelled-out digits.
+    const keyterms: string[] = lang === 'zh'
+      ? [
+          '零', '一', '二', '三', '四', '五', '六', '七', '八', '九',
+          '零一二三', '一二三四', '二三四五', '三四五六', '四五六七',
+          '五六七八', '六七八九', '七八九零', '八九零一', '九零一二',
+          '一零', '二一', '三二', '四三', '五四', '六五', '七六', '八七', '九八',
+        ]
+      : [
+          'zero', 'one', 'two', 'three', 'four', 'five',
+          'six', 'seven', 'eight', 'nine',
+        ];
+
+    const keytermParams = keyterms
+      .map(t => `keyterm=${encodeURIComponent(t)}`)
+      .join('&');
+
+    // numerals=true converts spoken numbers to digits.
+    // We request nova-3 with the full Mandarin model variant for best Chinese accuracy.
+    const endpoint = `https://api.deepgram.com/v1/listen?model=nova-3&language=${lang}&smart_format=true&punctuate=true&numerals=true&${keytermParams}`;
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -97,11 +118,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let transcript = result?.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
     const confidence = result?.results?.channels?.[0]?.alternatives?.[0]?.confidence || 0;
 
-    // Extract only digits and relevant characters for SKU number search
+    // Extract only digits and hyphens/underscores for SKU number search
     // This applies to both English and Chinese
     const cleanedTranscript = transcript
-      .replace(/[^\d\s\-_]/g, '') // Remove non-digits except spaces, hyphens, underscores
-      .replace(/\s+/g, ' ')        // Normalize spaces
+      .replace(/[^\d\-_]/g, '') // Remove non-digits except hyphens and underscores
       .trim();
 
     const trimmed = cleanedTranscript || transcript.trim();

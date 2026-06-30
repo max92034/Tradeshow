@@ -22,7 +22,6 @@ export function VoiceSearchButton() {
     pressedRef.current = true;
     setPressed(true);
 
-    // Blur any focused input to prevent keyboard from popping up on mobile
     if (document.activeElement && document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }

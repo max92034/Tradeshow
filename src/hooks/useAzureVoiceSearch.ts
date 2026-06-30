@@ -3,12 +3,13 @@ import { useSettingsStore } from '../store/useSettingsStore';
 
 interface UseVoiceSearchOptions {
   onResult: (text: string) => void;
-  lang?: string; // Optional - if not provided, uses settings store preference
+  lang?: string;
 }
 
 export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
+  const [isPreparing, setIsPreparing] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -16,9 +17,12 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
-  const pressedRef = useRef(false);
   const onResultRef = useRef(onResult);
   const mimeTypeRef = useRef<string>('');
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const cachedStreamRef = useRef<MediaStream | null>(null);
+  const cachedRecorderRef = useRef<MediaRecorder | null>(null);
+  const stopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     onResultRef.current = onResult;
@@ -26,6 +30,21 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
 
   useEffect(() => {
     setIsSupported(true);
+    if (typeof window !== 'undefined' && window.AudioContext) {
+      audioContextRef.current = new AudioContext();
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+      }
+      if (cachedStreamRef.current) {
+        cachedStreamRef.current.getTracks().forEach(t => t.stop());
+      }
+    };
   }, []);
 
   function getApiUrl(): string {
@@ -40,10 +59,9 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
   }
 
   function getBestAudioMimeType(): string {
-    // iOS Safari prefers MP4/AAC, Chrome/Android prefers WebM/Opus
     const types = [
-      'audio/mp4',           // iOS Safari (AAC)
-      'audio/webm;codecs=opus', // Chrome/Android
+      'audio/mp4',
+      'audio/webm;codecs=opus',
       'audio/webm',
       'audio/ogg;codecs=opus',
       'audio/ogg',
@@ -53,16 +71,42 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
         return type;
       }
     }
-    // Fallback - let browser choose
     return '';
   }
 
-  useEffect(() => {
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
-      }
-    };
+  const initializeMicrophone = useCallback(async (): Promise<{ stream: MediaStream; recorder: MediaRecorder; mimeType: string }> => {
+    if (cachedStreamRef.current && cachedRecorderRef.current) {
+      return {
+        stream: cachedStreamRef.current,
+        recorder: cachedRecorderRef.current,
+        mimeType: mimeTypeRef.current,
+      };
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: true,
+        channelCount: 1,
+      },
+    });
+
+    const mimeType = getBestAudioMimeType();
+    mimeTypeRef.current = mimeType;
+
+    const recorderOptions: MediaRecorderOptions = {};
+    if (mimeType) {
+      recorderOptions.mimeType = mimeType;
+    }
+    recorderOptions.audioBitsPerSecond = 128000;
+
+    const recorder = new MediaRecorder(stream, recorderOptions);
+
+    cachedStreamRef.current = stream;
+    cachedRecorderRef.current = recorder;
+
+    return { stream, recorder, mimeType };
   }, []);
 
   const sendAudioForTranscription = useCallback(async (audioBlob: Blob, mimeType?: string) => {
@@ -71,18 +115,15 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
 
     const arrayBuffer = await audioBlob.arrayBuffer();
 
-    // Check for large audio files - split into chunks if needed
     if (arrayBuffer.byteLength > 10 * 1024 * 1024) {
       throw new Error('Audio too large - try recording shorter');
     }
 
-    // Convert to base64
     const base64 = btoa(
       new Uint8Array(arrayBuffer)
         .reduce((data, byte) => data + String.fromCharCode(byte), '')
     );
 
-    // Include mime type so API knows the format
     const payload = {
       audio: base64,
       language: lang || voiceLanguage,
@@ -117,28 +158,17 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
     setIsProcessing(false);
     audioChunksRef.current = [];
 
+    if (stopTimeoutRef.current) {
+      clearTimeout(stopTimeoutRef.current);
+      stopTimeoutRef.current = null;
+    }
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
+      const { stream, recorder } = await initializeMicrophone();
       streamRef.current = stream;
-
-      const mimeType = getBestAudioMimeType();
-      mimeTypeRef.current = mimeType;
-
-      const recorderOptions: MediaRecorderOptions = {};
-      if (mimeType) {
-        recorderOptions.mimeType = mimeType;
-      }
-      // Use higher bitrate for better recognition accuracy
-      recorderOptions.audioBitsPerSecond = 128000;
-
-      const recorder = new MediaRecorder(stream, recorderOptions);
       mediaRecorderRef.current = recorder;
+
+      audioChunksRef.current = [];
 
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
@@ -150,7 +180,6 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
         setIsListening(false);
         setIsProcessing(true);
 
-        // Check if we have audio data
         if (audioChunksRef.current.length === 0) {
           setError('No audio recorded - try holding longer');
           setIsProcessing(false);
@@ -159,7 +188,6 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
 
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeTypeRef.current || 'audio/webm' });
 
-        // Check if audio blob is too small (likely empty or corrupted)
         if (audioBlob.size < 100) {
           setError('Audio too short - try speaking longer');
           setIsProcessing(false);
@@ -180,7 +208,7 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
         }
       };
 
-      recorder.start(250);
+      recorder.start(0);
       setIsListening(true);
     } catch (e) {
       const err = e as Error | DOMException;
@@ -196,23 +224,25 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
         streamRef.current = null;
       }
     }
-  }, [sendAudioForTranscription]);
+  }, [initializeMicrophone, sendAudioForTranscription]);
 
   const stopListening = useCallback(() => {
-    pressedRef.current = false;
-
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+    if (stopTimeoutRef.current) {
+      clearTimeout(stopTimeoutRef.current);
     }
 
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
+    stopTimeoutRef.current = setTimeout(() => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+
       streamRef.current = null;
-    }
+    }, 200);
   }, []);
 
   return {
     isListening,
+    isPreparing,
     isSupported,
     transcript,
     error,
