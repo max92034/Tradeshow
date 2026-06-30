@@ -102,8 +102,6 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          sampleRate: 16000,
-          channelCount: 1,
         },
       });
       streamRef.current = stream;
@@ -111,10 +109,14 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
       const mimeType = getBestAudioMimeType();
       mimeTypeRef.current = mimeType;
 
-      const recorder = new MediaRecorder(stream, {
-        mimeType: mimeType || undefined,
-        audioBitsPerSecond: 24000,
-      });
+      const recorderOptions: MediaRecorderOptions = {};
+      if (mimeType) {
+        recorderOptions.mimeType = mimeType;
+      }
+      // Use 48kbps - reliable and still much smaller than default 128kbps
+      recorderOptions.audioBitsPerSecond = 48000;
+
+      const recorder = new MediaRecorder(stream, recorderOptions);
       mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (e) => {
