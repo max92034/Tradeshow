@@ -53,59 +53,89 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'No audio data provided' });
     }
 
-    // Supported languages - limit to English and Chinese for this app
-    const SUPPORTED_LANGUAGES = ['en', 'zh-CN', 'zh'];
-    const isLanguageAllowed = (lang: string) =>
-      SUPPORTED_LANGUAGES.some(supported =>
-        lang.toLowerCase().startsWith(supported.toLowerCase())
-      );
+    // Decode base64 audio
+    let audioBuffer: Buffer;
+    try {
+      audioBuffer = Buffer.from(audio, 'base64');
+    } catch {
+      return res.status(400).json({ error: 'Invalid audio data format' });
+    }
 
-    // Build API endpoint
-    let endpoint = 'https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true';
+    if (audioBuffer.length === 0) {
+      return res.status(400).json({ error: 'Audio data is empty' });
+    }
 
-    if (language && language !== 'auto') {
-      // Use the specified language if it's in our supported list
-      if (isLanguageAllowed(language)) {
-        endpoint += `&language=${language}`;
-      } else {
-        // Fallback to auto-detect if unsupported language requested
-        endpoint += '&detect_language=true';
+    // Build request headers
+    const headers = {
+      'Authorization': `Token ${apiKey}`,
+      'Content-Type': 'audio/webm',
+    };
+
+    // Helper to call Deepgram with a specific language
+    const transcribeWithLanguage = async (lang: string): Promise<{ transcript: string; confidence: number }> => {
+      const endpoint = `https://api.deepgram.com/v1/listen?model=nova-3&language=${lang}&smart_format=true&punctuate=true`;
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: audioBuffer,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Deepgram error: ${response.status}`);
       }
+
+      const result = await response.json();
+      const transcript = result?.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
+      const confidence = result?.results?.channels?.[0]?.alternatives?.[0]?.confidence || 0;
+
+      return { transcript: transcript.trim(), confidence };
+    };
+
+    let finalTranscript = '';
+    let finalConfidence = 0;
+
+    if (language === 'en') {
+      // English only mode
+      const result = await transcribeWithLanguage('en');
+      finalTranscript = result.transcript;
+      finalConfidence = result.confidence;
+    } else if (language === 'zh-CN' || language === 'zh') {
+      // Chinese only mode
+      const result = await transcribeWithLanguage('zh');
+      finalTranscript = result.transcript;
+      finalConfidence = result.confidence;
     } else {
-      // Auto-detect language
-      endpoint += '&detect_language=true';
+      // Auto mode: run both English and Chinese in parallel, pick the best result
+      const [enResult, zhResult] = await Promise.all([
+        transcribeWithLanguage('en'),
+        transcribeWithLanguage('zh'),
+      ]);
+
+      // Pick the result with higher confidence and non-empty transcript
+      if (enResult.transcript && zhResult.transcript) {
+        // Both have results - pick the one with higher confidence
+        if (enResult.confidence >= zhResult.confidence) {
+          finalTranscript = enResult.transcript;
+          finalConfidence = enResult.confidence;
+        } else {
+          finalTranscript = zhResult.transcript;
+          finalConfidence = zhResult.confidence;
+        }
+      } else if (enResult.transcript) {
+        finalTranscript = enResult.transcript;
+        finalConfidence = enResult.confidence;
+      } else if (zhResult.transcript) {
+        finalTranscript = zhResult.transcript;
+        finalConfidence = zhResult.confidence;
+      }
+      // If neither has results, return empty
     }
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Token ${apiKey}`,
-        'Content-Type': 'audio/webm',
-      },
-      body: Buffer.from(audio, 'base64'),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Deepgram error:', response.status, errorText);
-      return res.status(response.status).json({ error: `Deepgram error: ${response.status}` });
-    }
-
-    const result = await response.json();
-    let transcript = result?.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
-    const confidence = result?.results?.channels?.[0]?.alternatives?.[0]?.confidence || 0;
-
-    // If auto-detected language is not English or Chinese, return empty result
-    // This limits the app to only English and Chinese voice input
-    const detectedLanguage = result?.results?.channels?.[0]?.detected_language;
-    if (detectedLanguage && !isLanguageAllowed(detectedLanguage)) {
-      transcript = '';
-    }
-
-    if (transcript) {
-      return res.status(200).json({ text: transcript, confidence, detectedLanguage });
+    if (finalTranscript.length > 0) {
+      return res.status(200).json({ text: finalTranscript, confidence: finalConfidence });
     } else {
-      return res.status(200).json({ 
+      return res.status(200).json({
         text: '',
         error: 'No speech recognized - try speaking closer to the mic',
       });
