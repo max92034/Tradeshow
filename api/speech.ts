@@ -75,7 +75,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Use the specified language, default to Chinese
     const lang = language === 'en' ? 'en' : 'zh';
 
-    const endpoint = `https://api.deepgram.com/v1/listen?model=nova-3&language=${lang}&smart_format=true&punctuate=true`;
+    // numerals=true helps Deepgram recognize spoken numbers better
+    const endpoint = `https://api.deepgram.com/v1/listen?model=nova-3&language=${lang}&smart_format=true&punctuate=true&numerals=true`;
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -93,10 +94,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const result = await response.json();
-    const transcript = result?.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
+    let transcript = result?.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
     const confidence = result?.results?.channels?.[0]?.alternatives?.[0]?.confidence || 0;
 
-    const trimmed = transcript.trim();
+    // Post-process: extract only digits and relevant characters for SKU numbers
+    // This handles cases where voice recognition adds extra words
+    const cleanedTranscript = transcript
+      .replace(/[^\d\s\-_]/g, '') // Remove non-digits except spaces, hyphens, underscores
+      .replace(/\s+/g, ' ')        // Normalize spaces
+      .trim();
+
+    const trimmed = cleanedTranscript || transcript.trim();
     if (trimmed.length > 0) {
       return res.status(200).json({ text: trimmed, confidence });
     } else {
