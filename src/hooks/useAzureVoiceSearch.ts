@@ -2,10 +2,10 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 
 interface UseVoiceSearchOptions {
   onResult: (text: string) => void;
-  lang?: string;
+  lang?: string; // Optional - if not provided, Deepgram will auto-detect language
 }
 
-export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptions) {
+export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -71,10 +71,16 @@ export function useVoiceSearch({ onResult, lang = 'zh-CN' }: UseVoiceSearchOptio
         .reduce((data, byte) => data + String.fromCharCode(byte), '')
     );
 
+    // Send language only if specified; otherwise Deepgram auto-detects
+    const payload: { audio: string; language?: string } = { audio: base64 };
+    if (lang) {
+      payload.language = lang;
+    }
+
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ audio: base64, language: lang }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {

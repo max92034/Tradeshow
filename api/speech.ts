@@ -53,10 +53,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'No audio data provided' });
     }
 
-    const lang = language || 'zh-CN';
-
-    // Use nova-3 for best accuracy, smart_format for better output
-    const endpoint = `https://api.deepgram.com/v1/listen?model=nova-3&language=${lang}&smart_format=true`;
+    // Build API endpoint with automatic language detection
+    // If language is specified, use it; otherwise, let Deepgram auto-detect
+    let endpoint = 'https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true';
+    
+    if (language) {
+      endpoint += `&language=${language}`;
+    } else {
+      // Automatic language detection - works for English, Chinese, and 50+ other languages
+      endpoint += '&detect_language=true';
+    }
 
     const response = await fetch(endpoint, {
       method: 'POST',
