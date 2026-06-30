@@ -36,59 +36,59 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-[var(--bg-primary)]">
       <SearchHeader
         onUploadClick={() => setUploadOpen(true)}
         onHistoryClick={() => setHistoryOpen(true)}
         onSettingsClick={() => setSettingsOpen(true)}
       />
       
-      <main className="px-3 sm:px-6 py-4 sm:py-6 pb-28 sm:pb-6">
+      <main className="px-4 sm:px-8 py-6 sm:py-8 pb-32 sm:pb-8 content-layer">
         {!isLoaded || products.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 sm:py-24 text-center">
-            <div className="w-20 h-20 bg-cyan-100 rounded-full flex items-center justify-center mb-6">
-              <Package size={40} className="text-cyan-600" />
+          <div className="flex flex-col items-center justify-center py-16 sm:py-24 text-center animate-fade-in">
+            <div className="w-24 h-24 bg-[var(--accent-soft)] rounded-3xl flex items-center justify-center mb-6 shadow-lg shadow-[var(--accent)]/10">
+              <Package size={44} className="text-[var(--accent)]" strokeWidth={1.5} />
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-800 mb-2">
-              Welcome to TradeShow Order Manager
+            <h2 className="text-2xl sm:text-3xl font-display font-bold text-[var(--text-primary)] mb-3">
+              Welcome to TradeShow
             </h2>
-            <p className="text-slate-500 mb-6 max-w-md">
+            <p className="text-[var(--text-secondary)] mb-8 max-w-md leading-relaxed">
               Upload your product catalog to start searching and building orders.
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => setUploadOpen(true)}
-                className="flex items-center justify-center gap-2 px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold rounded-xl transition-all active:scale-95 shadow-lg shadow-cyan-600/25"
+                className="btn-primary"
               >
-                <UploadIcon size={20} />
+                <UploadIcon size={18} />
                 Upload Products
               </button>
               <button
                 onClick={handleLoadSample}
-                className="flex items-center justify-center gap-2 px-6 py-3 bg-white border-2 border-cyan-600 text-cyan-700 hover:bg-cyan-50 font-semibold rounded-xl transition-all active:scale-95"
+                className="btn-secondary"
               >
-                <Sparkles size={20} />
+                <Sparkles size={18} />
                 Try Sample Data
               </button>
             </div>
-            <p className="text-xs text-slate-400 mt-4">
+            <p className="text-xs text-[var(--text-muted)] mt-5">
               Supports .xlsx, .xls, and .csv files
             </p>
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-slate-600">
+            <div className="flex items-center justify-between mb-5 sm:mb-6">
+              <p className="text-sm text-[var(--text-secondary)] font-body">
                 {query ? (
                   <span>
-                    <span className="font-semibold text-slate-800">{results.length}</span> results
+                    <span className="font-semibold text-[var(--text-primary)]">{results.length}</span> results
                     {results.length > 0 && (
-                      <span className="text-slate-400"> of {products.length}</span>
+                      <span className="text-[var(--text-muted)]"> of {products.length}</span>
                     )}
                   </span>
                 ) : (
                   <span>
-                    <span className="font-semibold text-slate-800">{products.length}</span> products
+                    <span className="font-semibold text-[var(--text-primary)]">{products.length}</span> products
                   </span>
                 )}
               </p>

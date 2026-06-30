@@ -1,5 +1,6 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
-import { Mic, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
+import { VoiceIcon } from './VoiceIcon';
 import { useVoiceSearch } from '../hooks/useAzureVoiceSearch';
 import { useSearchStore } from '../store/useSearchStore';
 import { cn } from '../lib/utils';
@@ -57,9 +58,9 @@ export function VoiceSearchButton() {
 
   if (!isSupported) {
     return (
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 sm:hidden">
         <div className="px-4 py-2 rounded-xl text-sm bg-amber-500 text-white text-center shadow-lg">
-          Voice not supported on this browser
+          Voice not supported
         </div>
       </div>
     );
@@ -68,11 +69,11 @@ export function VoiceSearchButton() {
   const showIndicator = isListening || isProcessing || error || transcript;
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-3">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-3 sm:hidden">
       {showIndicator && (
         <div className={cn(
           "px-4 py-3 rounded-2xl text-sm max-w-[80vw] text-center shadow-xl font-medium",
-          error ? "bg-red-500 text-white" : "bg-slate-900 text-white"
+          error ? "bg-red-500 text-white" : "bg-[var(--text-primary)] text-white"
         )}>
           {error ? (
             <div className="flex flex-col items-center gap-1">
@@ -92,25 +93,25 @@ export function VoiceSearchButton() {
         type="button"
         onPointerDown={onPointerDown}
         className={cn(
-          "w-20 h-20 rounded-full flex items-center justify-center shadow-2xl transition-transform select-none touch-none relative",
+          "w-20 h-20 rounded-full flex items-center justify-center shadow-2xl transition-all duration-200 select-none touch-none relative",
           error
             ? "bg-amber-500 text-white"
             : isListening
-              ? "bg-red-500 text-white scale-110"
+              ? "bg-[#e85d2a] text-white scale-110"
               : isProcessing
-                ? "bg-purple-500 text-white scale-105"
+                ? "bg-[var(--text-secondary)] text-white scale-105"
                 : pressed
-                  ? "bg-cyan-700 text-white scale-95"
-                  : "bg-cyan-600 text-white active:scale-95"
+                  ? "bg-[#1a9cd8] text-white scale-95"
+                  : "bg-[#2aace8] text-white active:scale-95 shadow-lg shadow-[#2aace8]/30"
         )}
         aria-label="Hold to voice search"
       >
-        <Mic size={32} className={cn((isListening || isProcessing) && "animate-pulse")} />
+        <VoiceIcon size={32} active={isListening || isProcessing} />
         {(isListening || isProcessing) && (
-          <span className="absolute inset-0 rounded-full bg-red-400 animate-ping opacity-75" />
+          <span className="absolute inset-0 rounded-full bg-[#e85d2a] animate-ping opacity-40" />
         )}
       </button>
-      <p className="text-xs text-slate-500 font-medium text-center">
+      <p className="text-xs text-[var(--text-muted)] font-medium text-center">
         {isProcessing ? "Processing voice..." : isListening ? "Release to search" : error ? "Press and hold to retry" : "Hold to speak"}
       </p>
     </div>

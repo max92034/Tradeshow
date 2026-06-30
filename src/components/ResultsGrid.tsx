@@ -11,17 +11,15 @@ interface ResultsGridProps {
 export const ResultsGrid = React.memo(function ResultsGrid({ products, isLoading }: ResultsGridProps) {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {[...Array(6)].map((_, i) => (
-          <div key={i} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 animate-pulse">
-            <div className="flex gap-4">
-              <div className="w-28 h-28 bg-slate-200 rounded-lg" />
-              <div className="flex-1 space-y-2">
-                <div className="h-4 bg-slate-200 rounded w-1/2" />
-                <div className="h-5 bg-slate-200 rounded w-3/4" />
-                <div className="h-3 bg-slate-200 rounded w-1/3" />
-                <div className="h-8 bg-slate-200 rounded w-full mt-4" />
-              </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
+        {[...Array(8)].map((_, i) => (
+          <div key={i} className="card h-80 animate-pulse overflow-hidden">
+            <div className="h-40 bg-[var(--bg-secondary)]" />
+            <div className="p-4 space-y-3">
+              <div className="h-4 bg-[var(--bg-secondary)] rounded-full w-1/3" />
+              <div className="h-5 bg-[var(--bg-secondary)] rounded-lg w-3/4" />
+              <div className="h-4 bg-[var(--bg-secondary)] rounded-full w-1/2" />
+              <div className="h-10 bg-[var(--bg-secondary)] rounded-full w-full mt-4" />
             </div>
           </div>
         ))}
@@ -31,10 +29,12 @@ export const ResultsGrid = React.memo(function ResultsGrid({ products, isLoading
 
   if (products.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-        <Package size={64} strokeWidth={1} className="mb-4" />
-        <h3 className="text-lg font-medium text-slate-600">No products found</h3>
-        <p className="text-sm mt-1">Try a different search term or upload a product file</p>
+      <div className="flex flex-col items-center justify-center py-16 sm:py-24 text-center">
+        <div className="w-20 h-20 bg-[var(--bg-secondary)] rounded-3xl flex items-center justify-center mb-5">
+          <Package size={40} strokeWidth={1} className="text-[var(--text-muted)]" />
+        </div>
+        <h3 className="text-xl font-display font-semibold text-[var(--text-primary)] mb-2">No products found</h3>
+        <p className="text-sm text-[var(--text-secondary)]">Try a different search term or upload a product file</p>
       </div>
     );
   }
@@ -52,7 +52,7 @@ export const ResultsGrid = React.memo(function ResultsGrid({ products, isLoading
   }, [products]);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
       {productCards}
     </div>
   );

@@ -1,6 +1,7 @@
 import React from 'react';
-import { X, Settings as SettingsIcon } from 'lucide-react';
+import { X, Settings as SettingsIcon, Sparkles, Minimize2 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useSettingsStore } from '../store/useSettingsStore';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -8,6 +9,9 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
+  const theme = useSettingsStore(state => state.theme);
+  const setTheme = useSettingsStore(state => state.setTheme);
+
   return (
     <>
       <div
@@ -44,10 +48,57 @@ export const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose
           </button>
         </div>
 
-        <div className="p-5 text-center text-slate-500 text-sm">
-          Voice language can be toggled from the mobile menu.
-          <br />
-          <span className="text-xs">语音语言可在菜单中切换</span>
+        <div className="p-5 space-y-5">
+          <div className="space-y-3">
+            <div>
+              <h3 className="font-semibold text-slate-800 text-sm">Theme</h3>
+              <p className="text-xs text-slate-500">Choose your preferred visual style</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setTheme('minimal')}
+                className={cn(
+                  "p-4 rounded-xl border-2 transition-all text-left",
+                  theme === 'minimal'
+                    ? "border-orange-500 bg-orange-50 shadow-md"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                )}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Minimize2 size={16} className={cn(theme === 'minimal' ? 'text-orange-500' : 'text-slate-400')} />
+                  <span className={cn("font-semibold text-sm", theme === 'minimal' ? 'text-orange-700' : 'text-slate-700')}>
+                    Minimal
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500">Clean, modern, refined</p>
+              </button>
+              <button
+                onClick={() => setTheme('trumpian')}
+                className={cn(
+                  "p-4 rounded-xl border-2 transition-all text-left",
+                  theme === 'trumpian'
+                    ? "border-yellow-500 bg-yellow-50 shadow-md"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                )}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles size={16} className={cn(theme === 'trumpian' ? 'text-yellow-600' : 'text-slate-400')} />
+                  <span className={cn("font-semibold text-sm", theme === 'trumpian' ? 'text-yellow-700' : 'text-slate-700')}>
+                    Trumpian
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500">Gold, glamorous, HUGE</p>
+              </button>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100">
+            <p className="text-xs text-slate-400 text-center">
+              Voice language can be toggled from the mobile menu.
+              <br />
+              语音语言可在菜单中切换
+            </p>
+          </div>
         </div>
 
         <div className="p-4 border-t border-slate-200 flex justify-end">

@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
-import { Search, Mic, ScanLine, Upload, ShoppingCart, History, X, Settings, Menu } from 'lucide-react';
+import { Search, Mic, Upload, ShoppingCart, History, X, Settings, Menu } from 'lucide-react';
+import { VoiceIcon } from './VoiceIcon';
 import { useSearchStore } from '../store/useSearchStore';
 import { useOrderStore } from '../store/useOrderStore';
 import { useVoiceSearch } from '../hooks/useAzureVoiceSearch';
@@ -72,53 +73,50 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
   }, [setQuery, performSearch]);
 
   return (
-    <header className="sticky top-0 z-30 bg-slate-900 text-white shadow-lg">
-      <div className="px-3 sm:px-6 py-3 sm:py-4">
-        <div className="flex items-center gap-2 sm:gap-4">
-          <h1 className="text-lg sm:text-2xl font-bold text-cyan-400 tracking-tight hidden sm:block whitespace-nowrap">
-            Trade<span className="text-white">Show</span>
+    <header className="sticky top-0 z-30 bg-[var(--text-primary)] text-white shadow-xl">
+      <div className="px-4 sm:px-8 py-4 sm:py-5 content-layer">
+        <div className="flex items-center gap-3 sm:gap-6">
+          <h1 className="text-xl sm:text-3xl font-display font-bold tracking-tight hidden sm:block whitespace-nowrap">
+            <span className="text-[var(--accent)]">Trade</span>Show
           </h1>
           
           <div className="flex-1 relative">
             <div className="relative flex items-center">
-              <Search className="absolute left-3 text-slate-400 pointer-events-none" size={20} />
+              <Search className="absolute left-4 text-[var(--text-muted)] pointer-events-none" size={18} strokeWidth={1.5} />
               <input
                 ref={inputRef}
                 type="text"
                 value={query}
                 onChange={handleChange}
                 placeholder="Search SKU, description, keyword..."
-                className="w-full pl-10 pr-16 sm:pr-24 py-2.5 sm:py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-sm sm:text-base transition-all"
+                className="w-full pl-11 pr-16 sm:pr-24 py-3 sm:py-3.5 bg-white/[0.06] border border-white/[0.08] rounded-2xl text-white placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)]/30 text-sm sm:text-base transition-all duration-200 font-body"
               />
               <div className="absolute right-2 flex items-center gap-1">
                 {query && (
                   <button
                     onClick={handleClear}
-                    className="p-1.5 text-slate-400 hover:text-white transition-colors"
+                    className="p-1.5 text-[var(--text-muted)] hover:text-white transition-colors rounded-full"
                   >
-                    <X size={18} />
+                    <X size={16} />
                   </button>
                 )}
                 {voiceSupported && (
                   <button
                     onClick={handleVoiceToggle}
                     className={cn(
-                      "p-1.5 sm:p-2 rounded-lg transition-all hidden sm:block",
+                      "p-2 rounded-full transition-all duration-200 hidden sm:block relative",
                       isListening
-                        ? "bg-red-500 text-white animate-pulse"
-                        : "text-slate-400 hover:text-white hover:bg-slate-700"
+                        ? "bg-[#e85d2a] text-white shadow-lg shadow-[#e85d2a]/40 animate-pulse-soft"
+                        : "bg-[#2aace8] text-white shadow-lg shadow-[#2aace8]/30 hover:bg-[#1a9cd8] hover:shadow-xl hover:shadow-[#2aace8]/40 active:scale-95"
                     )}
                     title="Voice search"
                   >
-                    <Mic size={18} />
+                    <VoiceIcon size={18} active={isListening} />
+                    {!isListening && (
+                      <span className="absolute inset-0 rounded-full bg-[#2aace8] opacity-0 hover:opacity-20 transition-opacity" />
+                    )}
                   </button>
                 )}
-                <button
-                  className="p-1.5 sm:p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all hidden sm:block"
-                  title="Barcode scan"
-                >
-                  <ScanLine size={18} />
-                </button>
               </div>
             </div>
           </div>
@@ -126,43 +124,43 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
           <div className="flex items-center gap-1 sm:gap-2">
             <button
               onClick={onSettingsClick}
-              className="p-2 sm:p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all hidden sm:block"
+              className="p-2.5 text-[var(--text-muted)] hover:text-white hover:bg-white/10 rounded-2xl transition-all duration-200 hidden sm:block"
               title="Settings"
             >
-              <Settings size={20} />
+              <Settings size={20} strokeWidth={1.5} />
             </button>
             
             <button
               onClick={onHistoryClick}
-              className="p-2 sm:p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all hidden sm:block"
+              className="p-2.5 text-[var(--text-muted)] hover:text-white hover:bg-white/10 rounded-2xl transition-all duration-200 hidden sm:block"
               title="Order history"
             >
-              <History size={20} />
+              <History size={20} strokeWidth={1.5} />
             </button>
             
             <button
               onClick={onUploadClick}
-              className="p-2 sm:p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all hidden sm:block"
+              className="p-2.5 text-[var(--text-muted)] hover:text-white hover:bg-white/10 rounded-2xl transition-all duration-200 hidden sm:block"
               title="Upload products"
             >
-              <Upload size={20} />
+              <Upload size={20} strokeWidth={1.5} />
             </button>
 
             <div className="relative sm:hidden" ref={menuRef}>
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
                 className={cn(
-                  "p-2 rounded-xl transition-all",
-                  menuOpen ? "bg-slate-800 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"
+                  "p-2.5 rounded-2xl transition-all duration-200",
+                  menuOpen ? "bg-white/10 text-white" : "text-[var(--text-muted)] hover:text-white hover:bg-white/10"
                 )}
                 title="Menu"
               >
-                {menuOpen ? <X size={20} /> : <Menu size={20} />}
+                {menuOpen ? <X size={20} strokeWidth={1.5} /> : <Menu size={20} strokeWidth={1.5} />}
               </button>
 
               <div
                 className={cn(
-                  "absolute right-0 top-12 w-56 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 overflow-hidden z-50",
+                  "absolute right-0 top-14 w-64 bg-[var(--bg-card)] rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden z-50",
                   "transition-all duration-200 origin-top-right",
                   menuOpen ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"
                 )}
@@ -172,12 +170,12 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
                     onSettingsClick();
                     closeMenu();
                   }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-all"
+                  className="w-full flex items-center gap-3 px-4 py-3.5 text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)] transition-all duration-200"
                 >
-                  <Settings size={18} />
+                  <Settings size={18} strokeWidth={1.5} />
                   <div className="flex-1 text-left">
                     <div className="font-medium text-sm">Settings</div>
-                    <div className="text-xs text-slate-500">设置</div>
+                    <div className="text-xs text-[var(--text-muted)]">设置</div>
                   </div>
                 </button>
 
@@ -185,37 +183,37 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
                   onClick={() => {
                     toggleVoiceLanguage();
                   }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-all border-t border-slate-700"
+                  className="w-full flex items-center gap-3 px-4 py-3.5 text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)] transition-all duration-200 border-t border-[var(--border-soft)]"
                 >
-                  <Mic size={18} />
+                  <Mic size={18} strokeWidth={1.5} />
                   <div className="flex-1 text-left">
                     <div className="font-medium text-sm">
                       Voice: {voiceLanguage === 'zh-CN' ? '中文' : 'English'}
                     </div>
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs text-[var(--text-muted)]">
                       Tap to switch / 点击切换
                     </div>
                   </div>
                   <div className={cn(
-                    "px-2 py-0.5 rounded text-xs font-bold",
-                    voiceLanguage === 'zh-CN' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'
+                    "px-2 py-0.5 rounded-full text-xs font-bold",
+                    voiceLanguage === 'zh-CN' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'
                   )}>
                     {voiceLanguage === 'zh-CN' ? '中' : 'EN'}
                   </div>
                 </button>
 
-                <div className="border-t border-slate-700">
+                <div className="border-t border-[var(--border-soft)]">
                   <button
                     onClick={() => {
                       onHistoryClick();
                       closeMenu();
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-all"
+                    className="w-full flex items-center gap-3 px-4 py-3.5 text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)] transition-all duration-200"
                   >
-                    <History size={18} />
+                    <History size={18} strokeWidth={1.5} />
                     <div className="flex-1 text-left">
                       <div className="font-medium text-sm">Order History</div>
-                      <div className="text-xs text-slate-500">订单历史</div>
+                      <div className="text-xs text-[var(--text-muted)]">订单历史</div>
                     </div>
                   </button>
 
@@ -224,12 +222,12 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
                       onUploadClick();
                       closeMenu();
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-all"
+                    className="w-full flex items-center gap-3 px-4 py-3.5 text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)] transition-all duration-200"
                   >
-                    <Upload size={18} />
+                    <Upload size={18} strokeWidth={1.5} />
                     <div className="flex-1 text-left">
                       <div className="font-medium text-sm">Upload Products</div>
-                      <div className="text-xs text-slate-500">上传产品</div>
+                      <div className="text-xs text-[var(--text-muted)]">上传产品</div>
                     </div>
                   </button>
                 </div>
@@ -238,12 +236,12 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
             
             <button
               onClick={() => toggleDrawer(true)}
-              className="relative p-2 sm:p-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl transition-all active:scale-95"
+              className="relative p-2.5 sm:p-3 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-2xl transition-all duration-200 active:scale-95 shadow-lg shadow-[var(--accent)]/25"
               title="View order"
             >
-              <ShoppingCart size={20} />
+              <ShoppingCart size={20} strokeWidth={1.5} />
               {totalItems > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-amber-500 text-slate-900 text-xs font-bold rounded-full flex items-center justify-center animate-bounce-in">
+                <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 bg-white text-[var(--accent)] text-xs font-bold rounded-full flex items-center justify-center animate-bounce-in font-body">
                   {totalItems > 99 ? '99+' : totalItems}
                 </span>
               )}
