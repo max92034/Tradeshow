@@ -43,14 +43,23 @@ export function VoiceSearchButton() {
 
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onCancel);
+    window.addEventListener('touchend', onUp);
+    window.addEventListener('touchcancel', onCancel);
 
     return () => {
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onCancel);
+      window.removeEventListener('touchend', onUp);
+      window.removeEventListener('touchcancel', onCancel);
     };
   }, [handleStop]);
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
+    e.stopPropagation();
+    handleStart();
+  }, [handleStart]);
+
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
     e.stopPropagation();
     handleStart();
   }, [handleStart]);
@@ -96,8 +105,9 @@ export function VoiceSearchButton() {
       <button
         type="button"
         onPointerDown={onPointerDown}
+        onTouchStart={onTouchStart}
         className={cn(
-          "w-20 h-20 rounded-full flex items-center justify-center shadow-2xl transition-all duration-200 select-none touch-none relative",
+          "w-20 h-20 rounded-full flex items-center justify-center shadow-2xl transition-all duration-200 select-none touch-manipulation relative",
           error
             ? "bg-amber-500 text-white"
             : isListening

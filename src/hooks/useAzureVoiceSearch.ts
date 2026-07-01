@@ -139,13 +139,31 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
     const isIOS = isIOSRef.current;
 
     try {
-      // iOS: Always stop any previous stream tracks — iOS can't reuse streams
+      // iOS: stop any leftover tracks before starting fresh
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop());
         streamRef.current = null;
       }
 
-      // Get fresh stream every time (iOS can't cache streams reliably)
+      // Create/resume AudioContext BEFORE awaiting getUserMedia
+      // iOS requires AudioContext creation within the user gesture
+      if (typeof window !== 'undefined') {
+        const AC = window.AudioContext || (window as any).webkitAudioContext;
+        if (AC) {
+          if (!audioContextRef.current) {
+            audioContextRef.current = new AC();
+          }
+          if (audioContextRef.current.state === 'suspended') {
+            try {
+              await audioContextRef.current.resume();
+            } catch {
+              // ignore
+            }
+          }
+        }
+      }
+
+      // Get fresh stream (iOS can't cache streams)
       const constraints: MediaStreamConstraints = {
         audio: isIOS
           ? true
@@ -160,22 +178,15 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
 
-      // Create/resume AudioContext within the user gesture (required by iOS)
-      if (!audioContextRef.current && typeof window !== 'undefined') {
-        const AC = window.AudioContext || (window as any).webkitAudioContext;
-        if (AC) {
-          audioContextRef.current = new AC();
-        }
+      // Verify audio track is live and enabled
+      const audioTracks = stream.getAudioTracks();
+      if (audioTracks.length === 0) {
+        throw new Error('No audio track available');
       }
-      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-        try {
-          await audioContextRef.current.resume();
-        } catch {
-          // Resume can fail if not in gesture, ignore
-        }
-      }
+      const track = audioTracks[0];
+      if (!track.enabled) track.enabled = true;
 
-      // Determine best mime type
+      // Determine mime type
       const mimeType = getBestAudioMimeType();
       mimeTypeRef.current = mimeType;
 
@@ -187,7 +198,7 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
         recorderOptions.audioBitsPerSecond = 128000;
       }
 
-      // Always create a new MediaRecorder (iOS can't restart stopped ones)
+      // Always create new MediaRecorder (iOS can't restart stopped ones)
       const recorder = new MediaRecorder(stream, recorderOptions);
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
@@ -202,8 +213,8 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
         setIsListening(false);
         setIsProcessing(true);
 
-        // Small delay to let any late ondataavailable fire (iOS quirk)
-        await new Promise(r => setTimeout(r, 150));
+        // Brief wait for any late ondataavailable
+        await new Promise(r => setTimeout(r, 100));
 
         if (audioChunksRef.current.length === 0) {
           setError('No audio recorded - try holding longer');
@@ -213,7 +224,7 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
 
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeTypeRef.current || 'audio/webm' });
 
-        if (audioBlob.size < 200) {
+        if (audioBlob.size < 100) {
           setError('Audio too short - try speaking longer');
           setIsProcessing(false);
           audioChunksRef.current = [];
@@ -233,15 +244,18 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
         }
       };
 
-      recorder.onerror = () => {
-        setError('Recording error - try again');
+      recorder.onerror = (e: Event) => {
+        const err = (e as any).error;
+        setError('Recording error: ' + (err?.message || 'unknown'));
         setIsListening(false);
         setIsPreparing(false);
       };
 
-      // Start recording — NO timeslice on iOS (data only comes on stop)
-      // On non-iOS, timeslice=0 also delivers data on stop
-      recorder.start();
+      // iOS: use 100ms timeslice to ensure regular data delivery
+      // Without timeslice, iOS MediaRecorder may not produce data
+      // Desktop/Android: timeslice=0 means deliver all data on stop
+      const timeslice = isIOS ? 100 : 0;
+      recorder.start(timeslice);
 
       setIsPreparing(false);
       setIsListening(true);
@@ -253,7 +267,7 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
         setError('No microphone found on this device');
       } else {
-        setError('Could not start recording: ' + (err.message || 'Unknown error'));
+        setError('Could not start: ' + (err.message || 'Unknown error'));
       }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop());
@@ -268,41 +282,27 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
     }
 
     const isIOS = isIOSRef.current;
-    // Longer delay on iOS to ensure all audio is captured
-    const delay = isIOS ? 500 : 200;
+    const delay = isIOS ? 400 : 200;
 
     stopTimeoutRef.current = setTimeout(() => {
       const recorder = mediaRecorderRef.current;
       if (recorder && recorder.state !== 'inactive') {
         try {
-          // Force flush any buffered data before stopping (critical for iOS)
-          if (typeof recorder.requestData === 'function') {
-            recorder.requestData();
-          }
+          recorder.stop();
         } catch {
           // ignore
         }
-
-        // Wait briefly after requestData, then stop
-        setTimeout(() => {
-          try {
-            if (recorder.state !== 'inactive') {
-              recorder.stop();
-            }
-          } catch {
-            // ignore
-          }
-        }, 100);
       }
 
-      // iOS: stop stream tracks after recording (don't reuse streams)
-      if (isIOS && streamRef.current) {
+      // iOS: stop stream tracks after recording completes
+      if (isIOS) {
         setTimeout(() => {
           if (streamRef.current) {
             streamRef.current.getTracks().forEach(t => t.stop());
             streamRef.current = null;
           }
-        }, 300);
+          mediaRecorderRef.current = null;
+        }, 400);
       }
     }, delay);
   }, []);
