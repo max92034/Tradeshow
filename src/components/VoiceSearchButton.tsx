@@ -1,5 +1,5 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { VoiceIcon } from './VoiceIcon';
 import { useVoiceSearch } from '../hooks/useAzureVoiceSearch';
 import { useSearchStore } from '../store/useSearchStore';
@@ -11,7 +11,7 @@ export function VoiceSearchButton() {
   const [pressed, setPressed] = useState(false);
   const pressedRef = useRef(false);
 
-  const { isListening, isSupported, transcript, error, isProcessing, startListening, stopListening } = useVoiceSearch({
+  const { isListening, isPreparing, isSupported, transcript, error, isProcessing, startListening, stopListening } = useVoiceSearch({
     onResult: useCallback((text) => {
       setQuery(text);
       performSearch(text);
@@ -51,7 +51,6 @@ export function VoiceSearchButton() {
   }, [handleStop]);
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
-    e.preventDefault();
     e.stopPropagation();
     handleStart();
   }, [handleStart]);
@@ -66,7 +65,7 @@ export function VoiceSearchButton() {
     );
   }
 
-  const showIndicator = isListening || isProcessing || error || transcript;
+  const showIndicator = isListening || isPreparing || isProcessing || error || transcript;
 
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-3 sm:hidden">
@@ -82,6 +81,11 @@ export function VoiceSearchButton() {
             </div>
           ) : isProcessing ? (
             <span>Processing...</span>
+          ) : isPreparing ? (
+            <div className="flex flex-col items-center gap-1">
+              <Loader2 size={20} className="animate-spin" />
+              <span>Preparing mic...</span>
+            </div>
           ) : transcript ? (
             <span>{transcript}</span>
           ) : (
@@ -100,9 +104,11 @@ export function VoiceSearchButton() {
               ? "bg-[#e85d2a] text-white scale-110"
               : isProcessing
                 ? "bg-[var(--text-secondary)] text-white scale-105"
-                : pressed
-                  ? "bg-[#1a9cd8] text-white scale-95"
-                  : "bg-[#2aace8] text-white active:scale-95 shadow-lg shadow-[#2aace8]/30"
+                : isPreparing
+                  ? "bg-[var(--text-secondary)] text-white animate-pulse"
+                  : pressed
+                    ? "bg-[#1a9cd8] text-white scale-95"
+                    : "bg-[#2aace8] text-white active:scale-95 shadow-lg shadow-[#2aace8]/30"
         )}
         aria-label="Hold to voice search"
       >
@@ -112,7 +118,7 @@ export function VoiceSearchButton() {
         )}
       </button>
       <p className="text-xs text-[var(--text-muted)] font-medium text-center">
-        {isProcessing ? "Processing voice..." : isListening ? "Release to search" : error ? "Press and hold to retry" : "Hold to speak"}
+        {isProcessing ? "Processing voice..." : isListening ? "Release to search" : isPreparing ? "Starting mic..." : error ? "Press and hold to retry" : "Hold to speak"}
       </p>
     </div>
   );

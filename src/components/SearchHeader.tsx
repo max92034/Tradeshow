@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
-import { Search, Mic, Upload, ShoppingCart, History, X, Settings, Menu } from 'lucide-react';
+import { Search, Mic, Upload, ShoppingCart, History, X, Settings, Menu, Sparkles, Minimize2 } from 'lucide-react';
 import { VoiceIcon } from './VoiceIcon';
 import { useSearchStore } from '../store/useSearchStore';
 import { useOrderStore } from '../store/useOrderStore';
@@ -24,6 +24,8 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
   const toggleDrawer = useOrderStore(state => state.toggleDrawer);
   const voiceLanguage = useSettingsStore(state => state.voiceLanguage);
   const toggleVoiceLanguage = useSettingsStore(state => state.toggleVoiceLanguage);
+  const theme = useSettingsStore(state => state.theme);
+  const toggleTheme = useSettingsStore(state => state.toggleTheme);
   
   const inputRef = useRef<HTMLInputElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -176,6 +178,33 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
                   <div className="flex-1 text-left">
                     <div className="font-medium text-sm">Settings</div>
                     <div className="text-xs text-[var(--text-muted)]">设置</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    toggleTheme();
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)] transition-all duration-200 border-t border-[var(--border-soft)]"
+                >
+                  {theme === 'trumpian' ? (
+                    <Sparkles size={18} strokeWidth={1.5} className="text-yellow-600" />
+                  ) : (
+                    <Minimize2 size={18} strokeWidth={1.5} className="text-orange-500" />
+                  )}
+                  <div className="flex-1 text-left">
+                    <div className="font-medium text-sm">
+                      Theme: {theme === 'trumpian' ? 'Trumpian' : 'Minimal'}
+                    </div>
+                    <div className="text-xs text-[var(--text-muted)]">
+                      Tap to switch / 点击切换
+                    </div>
+                  </div>
+                  <div className={cn(
+                    "px-2 py-0.5 rounded-full text-xs font-bold",
+                    theme === 'trumpian' ? 'bg-yellow-100 text-yellow-700' : 'bg-orange-100 text-orange-700'
+                  )}>
+                    {theme === 'trumpian' ? '✨' : '◻'}
                   </div>
                 </button>
 

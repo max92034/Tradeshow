@@ -20,18 +20,24 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
   const onResultRef = useRef(onResult);
   const mimeTypeRef = useRef<string>('');
   const audioContextRef = useRef<AudioContext | null>(null);
-  const cachedStreamRef = useRef<MediaStream | null>(null);
-  const cachedRecorderRef = useRef<MediaRecorder | null>(null);
   const stopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isIOSRef = useRef(false);
 
   useEffect(() => {
     onResultRef.current = onResult;
   }, [onResult]);
 
   useEffect(() => {
-    setIsSupported(true);
-    if (typeof window !== 'undefined' && window.AudioContext) {
-      audioContextRef.current = new AudioContext();
+    // Check MediaRecorder support
+    if (typeof MediaRecorder !== 'undefined' && typeof navigator !== 'undefined' && navigator.mediaDevices) {
+      setIsSupported(true);
+    }
+    // Detect iOS (including iPadOS 13+ which reports as Mac)
+    if (typeof navigator !== 'undefined') {
+      const ua = navigator.userAgent || '';
+      const isIOSDevice = /iPad|iPhone|iPod/.test(ua) ||
+        (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1);
+      isIOSRef.current = isIOSDevice;
     }
   }, []);
 
@@ -41,8 +47,8 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop());
       }
-      if (cachedStreamRef.current) {
-        cachedStreamRef.current.getTracks().forEach(t => t.stop());
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {});
       }
     };
   }, []);
@@ -67,47 +73,12 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
       'audio/ogg',
     ];
     for (const type of types) {
-      if (MediaRecorder.isTypeSupported(type)) {
+      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(type)) {
         return type;
       }
     }
     return '';
   }
-
-  const initializeMicrophone = useCallback(async (): Promise<{ stream: MediaStream; recorder: MediaRecorder; mimeType: string }> => {
-    if (cachedStreamRef.current && cachedRecorderRef.current) {
-      return {
-        stream: cachedStreamRef.current,
-        recorder: cachedRecorderRef.current,
-        mimeType: mimeTypeRef.current,
-      };
-    }
-
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: true,
-        channelCount: 1,
-      },
-    });
-
-    const mimeType = getBestAudioMimeType();
-    mimeTypeRef.current = mimeType;
-
-    const recorderOptions: MediaRecorderOptions = {};
-    if (mimeType) {
-      recorderOptions.mimeType = mimeType;
-    }
-    recorderOptions.audioBitsPerSecond = 128000;
-
-    const recorder = new MediaRecorder(stream, recorderOptions);
-
-    cachedStreamRef.current = stream;
-    cachedRecorderRef.current = recorder;
-
-    return { stream, recorder, mimeType };
-  }, []);
 
   const sendAudioForTranscription = useCallback(async (audioBlob: Blob, mimeType?: string) => {
     const apiUrl = getApiUrl();
@@ -163,15 +134,66 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
       stopTimeoutRef.current = null;
     }
 
-    try {
-      const { stream, recorder } = await initializeMicrophone();
-      streamRef.current = stream;
-      mediaRecorderRef.current = recorder;
+    setIsPreparing(true);
 
+    const isIOS = isIOSRef.current;
+
+    try {
+      // iOS: Always stop any previous stream tracks — iOS can't reuse streams
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+
+      // Get fresh stream every time (iOS can't cache streams reliably)
+      const constraints: MediaStreamConstraints = {
+        audio: isIOS
+          ? true
+          : {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: true,
+              channelCount: 1,
+            },
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      streamRef.current = stream;
+
+      // Create/resume AudioContext within the user gesture (required by iOS)
+      if (!audioContextRef.current && typeof window !== 'undefined') {
+        const AC = window.AudioContext || (window as any).webkitAudioContext;
+        if (AC) {
+          audioContextRef.current = new AC();
+        }
+      }
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        try {
+          await audioContextRef.current.resume();
+        } catch {
+          // Resume can fail if not in gesture, ignore
+        }
+      }
+
+      // Determine best mime type
+      const mimeType = getBestAudioMimeType();
+      mimeTypeRef.current = mimeType;
+
+      const recorderOptions: MediaRecorderOptions = {};
+      if (mimeType) {
+        recorderOptions.mimeType = mimeType;
+      }
+      if (!isIOS) {
+        recorderOptions.audioBitsPerSecond = 128000;
+      }
+
+      // Always create a new MediaRecorder (iOS can't restart stopped ones)
+      const recorder = new MediaRecorder(stream, recorderOptions);
+      mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
 
       recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
+        if (e.data && e.data.size > 0) {
           audioChunksRef.current.push(e.data);
         }
       };
@@ -179,6 +201,9 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
       recorder.onstop = async () => {
         setIsListening(false);
         setIsProcessing(true);
+
+        // Small delay to let any late ondataavailable fire (iOS quirk)
+        await new Promise(r => setTimeout(r, 150));
 
         if (audioChunksRef.current.length === 0) {
           setError('No audio recorded - try holding longer');
@@ -188,7 +213,7 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
 
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeTypeRef.current || 'audio/webm' });
 
-        if (audioBlob.size < 100) {
+        if (audioBlob.size < 200) {
           setError('Audio too short - try speaking longer');
           setIsProcessing(false);
           audioChunksRef.current = [];
@@ -208,9 +233,20 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
         }
       };
 
-      recorder.start(0);
+      recorder.onerror = () => {
+        setError('Recording error - try again');
+        setIsListening(false);
+        setIsPreparing(false);
+      };
+
+      // Start recording — NO timeslice on iOS (data only comes on stop)
+      // On non-iOS, timeslice=0 also delivers data on stop
+      recorder.start();
+
+      setIsPreparing(false);
       setIsListening(true);
     } catch (e) {
+      setIsPreparing(false);
       const err = e as Error | DOMException;
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         setError('Microphone access denied - allow mic in browser settings');
@@ -224,20 +260,51 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
         streamRef.current = null;
       }
     }
-  }, [initializeMicrophone, sendAudioForTranscription]);
+  }, [sendAudioForTranscription]);
 
   const stopListening = useCallback(() => {
     if (stopTimeoutRef.current) {
       clearTimeout(stopTimeoutRef.current);
     }
 
+    const isIOS = isIOSRef.current;
+    // Longer delay on iOS to ensure all audio is captured
+    const delay = isIOS ? 500 : 200;
+
     stopTimeoutRef.current = setTimeout(() => {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.stop();
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== 'inactive') {
+        try {
+          // Force flush any buffered data before stopping (critical for iOS)
+          if (typeof recorder.requestData === 'function') {
+            recorder.requestData();
+          }
+        } catch {
+          // ignore
+        }
+
+        // Wait briefly after requestData, then stop
+        setTimeout(() => {
+          try {
+            if (recorder.state !== 'inactive') {
+              recorder.stop();
+            }
+          } catch {
+            // ignore
+          }
+        }, 100);
       }
 
-      streamRef.current = null;
-    }, 200);
+      // iOS: stop stream tracks after recording (don't reuse streams)
+      if (isIOS && streamRef.current) {
+        setTimeout(() => {
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach(t => t.stop());
+            streamRef.current = null;
+          }
+        }, 300);
+      }
+    }, delay);
   }, []);
 
   return {

@@ -6,6 +6,7 @@ import { sampleProducts } from '../data/sampleProducts';
 interface ProductState {
   products: Product[];
   isLoaded: boolean;
+  version: number;
   loadProducts: (products: Product[]) => void;
   clearProducts: () => void;
   getProductBySku: (sku: string) => Product | undefined;
@@ -44,15 +45,18 @@ function migrateProducts(products: Product[]): Product[] {
 export const useProductStore = create<ProductState>((set, get) => ({
   products: [],
   isLoaded: false,
+  version: 0,
   
   loadProducts: (products: Product[]) => {
     const migrated = migrateProducts(products);
-    set({ products: migrated, isLoaded: true });
+    const newVersion = get().version + 1;
+    set({ products: migrated, isLoaded: true, version: newVersion });
     saveToStorage(storageKeys.PRODUCTS, migrated);
   },
   
   clearProducts: () => {
-    set({ products: [], isLoaded: false });
+    const newVersion = get().version + 1;
+    set({ products: [], isLoaded: false, version: newVersion });
     saveToStorage(storageKeys.PRODUCTS, []);
   },
   
@@ -61,7 +65,8 @@ export const useProductStore = create<ProductState>((set, get) => ({
   },
   
   loadSampleData: () => {
-    set({ products: sampleProducts, isLoaded: true });
+    const newVersion = get().version + 1;
+    set({ products: sampleProducts, isLoaded: true, version: newVersion });
     saveToStorage(storageKeys.PRODUCTS, sampleProducts);
   },
 }));

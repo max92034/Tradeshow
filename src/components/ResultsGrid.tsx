@@ -40,11 +40,10 @@ export const ResultsGrid = React.memo(function ResultsGrid({ products, isLoading
   }
 
   const productCards = useMemo(() => {
-    return products.map((product, index) => (
+    return products.map((product) => (
       <div
         key={product.sku}
-        className="animate-fade-in h-full"
-        style={{ animationDelay: `${Math.min(index * 30, 300)}ms` }}
+        className="animate-fade-in h-full card-content"
       >
         <ProductCard product={product} />
       </div>
