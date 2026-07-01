@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { ShoppingCart, MapPin, Package } from 'lucide-react';
+import { ShoppingCart, MapPin, Package, Ruler, Layers, Tag } from 'lucide-react';
 import { Product } from '../types';
 import { formatDimensions, formatCartonQty, formatPrice } from '../utils/formatters';
 import { useOrderStore } from '../store/useOrderStore';
@@ -8,6 +8,13 @@ import { cn } from '../lib/utils';
 interface ProductCardProps {
   product: Product;
 }
+
+const SectionHeader = ({ icon: Icon, title, colorClass }: { icon: React.ElementType; title: string; colorClass: string }) => (
+  <div className={cn("flex items-center gap-1.5 px-2 py-1 rounded-md mb-2", colorClass)}>
+    <Icon size={12} strokeWidth={2.5} />
+    <span className="text-xs font-semibold uppercase tracking-wide">{title}</span>
+  </div>
+);
 
 export const ProductCard = React.memo(function ProductCard({ product }: ProductCardProps) {
   const [added, setAdded] = useState(false);
@@ -47,50 +54,123 @@ export const ProductCard = React.memo(function ProductCard({ product }: ProductC
             <Package size={36} strokeWidth={1} />
           </div>
         )}
-        <div className="absolute top-3 left-3">
-          <span className="badge bg-[var(--accent-soft)] text-[var(--accent)] font-mono font-bold tracking-wide">
-            {product.sku}
-          </span>
-        </div>
       </div>
       
       <div className="flex-1 p-4 sm:p-5 flex flex-col gap-3 min-h-0">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="font-display text-[15px] font-semibold text-[var(--text-primary)] leading-snug line-clamp-2 flex-1">
+        {/* Product Identification Section */}
+        <SectionHeader 
+          icon={Tag} 
+          title="Product" 
+          colorClass="bg-violet-100 text-violet-700"
+        />
+        <div className="space-y-1.5">
+          {product.collection && (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide w-20">Collection</span>
+              <span className="text-xs font-medium text-[var(--text-primary)]">{product.collection}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide w-20">SKU</span>
+            <span className="badge bg-[var(--accent-soft)] text-[var(--accent)] font-mono font-bold tracking-wide text-[10px]">
+              {product.sku}
+            </span>
+          </div>
+          <h3 className="font-display text-[15px] font-semibold text-[var(--text-primary)] leading-snug line-clamp-2">
             {product.description}
           </h3>
-          <span className="font-display text-lg font-bold text-[var(--accent)] whitespace-nowrap flex-shrink-0">
-            {formatPrice(product.fobPrice)}
-          </span>
+          {product.location && (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide w-20">Location</span>
+              <span className="badge bg-[var(--bg-secondary)] text-[var(--text-secondary)]">
+                <MapPin size={10} />
+                {product.location}
+              </span>
+            </div>
+          )}
         </div>
         
+        {/* Physical Specifications Section */}
+        <SectionHeader 
+          icon={Ruler} 
+          title="Dimensions" 
+          colorClass="bg-emerald-100 text-emerald-700"
+        />
         <div className="flex flex-wrap gap-1.5">
-          {product.location && (
-            <span className="badge bg-[var(--bg-secondary)] text-[var(--text-secondary)]">
-              <MapPin size={12} />
-              {product.location}
-            </span>
-          )}
           {product.length || product.width || product.height ? (
-            <span className="badge bg-[var(--bg-secondary)] text-[var(--text-secondary)]">
+            <span className="badge bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-[10px]">
               {formatDimensions(product)}
             </span>
           ) : null}
+          {product.weight ? (
+            <span className="badge bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-[10px]">
+              {product.weight} kg
+            </span>
+          ) : null}
+        </div>
+        
+        {/* Packaging Section */}
+        <SectionHeader 
+          icon={Layers} 
+          title="Packaging" 
+          colorClass="bg-amber-100 text-amber-700"
+        />
+        <div className="flex flex-wrap gap-1.5">
+          {product.unit && (
+            <span className="badge bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-[10px]">
+              {product.unit}
+            </span>
+          )}
           {product.cartonQty > 0 && (
-            <span className="badge bg-amber-50 text-amber-700">
-              <Package size={12} />
+            <span className="badge bg-amber-50 text-amber-700 text-[10px]">
+              <Package size={10} />
               {formatCartonQty(product)}
+            </span>
+          )}
+          {product.innerQty > 0 && (
+            <span className="badge bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-[10px]">
+              Inner: {product.innerQty}
+            </span>
+          )}
+          {(product.cartonL || product.cartonW || product.cartonH) ? (
+            <span className="badge bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-[10px]">
+              Carton: {product.cartonL || 0}×{product.cartonW || 0}×{product.cartonH || 0} CM
+            </span>
+          ) : null}
+        </div>
+        
+        {/* Categorization Section */}
+        <SectionHeader 
+          icon={Tag} 
+          title="Category" 
+          colorClass="bg-rose-100 text-rose-700"
+        />
+        <div className="flex flex-wrap gap-1.5">
+          {product.category && (
+            <span className="badge bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-[10px]">
+              {product.category}
+            </span>
+          )}
+          {product.subcategory && (
+            <span className="badge bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-[10px]">
+              {product.subcategory}
             </span>
           )}
         </div>
         
-        {product.note && (
-          <p className="text-xs text-[var(--text-muted)] italic line-clamp-1">
-            Note: {product.note}
-          </p>
-        )}
+        {/* Price and Note */}
+        <div className="flex items-start justify-between gap-3 mt-auto">
+          <span className="font-display text-lg font-bold text-[var(--accent)] whitespace-nowrap flex-shrink-0">
+            {formatPrice(product.fobPrice)}
+          </span>
+          {product.note && (
+            <p className="text-xs text-[var(--text-muted)] italic line-clamp-1 flex-1 text-right">
+              Note: {product.note}
+            </p>
+          )}
+        </div>
         
-        <div className="mt-auto pt-2">
+        <div className="pt-2">
           <button
             onClick={handleAdd}
             className={cn(

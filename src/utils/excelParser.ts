@@ -3,18 +3,43 @@ import { Product } from '../types';
 import { sanitizeValue, sanitizeNumber } from './formatters';
 
 const COLUMN_MAP: Record<string, keyof Product> = {
+  // Product Identification
   'sku': 'sku',
   'description': 'description',
+  'collection': 'collection',
   'location': 'location',
-  'l': 'length',
-  'w': 'width',
-  'h': 'height',
-  'fob': 'fobPrice',
-  'fob price': 'fobPrice',
+
+  // Physical Specifications
+  'length': 'length',
+  'width': 'width',
+  'height': 'height',
+  'weight': 'weight',
+
+  // Packaging
   'unit': 'unit',
   'carton qty': 'cartonQty',
   'cartonqty': 'cartonQty',
   'ctn qty': 'cartonQty',
+  'carton qty/pcs': 'cartonQty',
+  'inner qty': 'innerQty',
+  'innerqty': 'innerQty',
+  'carton l': 'cartonL',
+  'cartonl': 'cartonL',
+  'carton l(cm)': 'cartonL',
+  'carton w': 'cartonW',
+  'cartonw': 'cartonW',
+  'carton w(cm)': 'cartonW',
+  'carton h': 'cartonH',
+  'cartonh': 'cartonH',
+  'carton h(cm)': 'cartonH',
+
+  // Categorization
+  'category': 'category',
+  'subcategory': 'subcategory',
+
+  // Other
+  'fob': 'fobPrice',
+  'fob price': 'fobPrice',
   'note': 'note',
   'notes': 'note',
   'img': 'imageUrl',
@@ -47,15 +72,28 @@ export function parseExcelFile(file: File): Promise<Product[]> {
           if (!row || row.every(cell => !cell || String(cell).trim() === '')) continue;
 
           const product: Product = {
+            // Product Identification
             sku: '',
             description: '',
+            collection: '',
             location: '',
+            // Physical Specifications
             length: 0,
             width: 0,
             height: 0,
-            fobPrice: 0,
+            weight: 0,
+            // Packaging
             unit: 'PC',
             cartonQty: 0,
+            innerQty: 0,
+            cartonL: 0,
+            cartonW: 0,
+            cartonH: 0,
+            // Categorization
+            category: '',
+            subcategory: '',
+            // Other
+            fobPrice: 0,
             note: '',
             imageUrl: '',
             keyword: '',
@@ -67,8 +105,10 @@ export function parseExcelFile(file: File): Promise<Product[]> {
             if (!mappedKey) continue;
 
             const value = row[j];
-            if (mappedKey === 'length' || mappedKey === 'width' || mappedKey === 'height' || 
-                mappedKey === 'fobPrice' || mappedKey === 'cartonQty') {
+            if (mappedKey === 'length' || mappedKey === 'width' || mappedKey === 'height' ||
+                mappedKey === 'weight' || mappedKey === 'fobPrice' || mappedKey === 'cartonQty' ||
+                mappedKey === 'innerQty' || mappedKey === 'cartonL' || mappedKey === 'cartonW' ||
+                mappedKey === 'cartonH') {
               (product[mappedKey] as number) = sanitizeNumber(value);
             } else {
               (product[mappedKey] as string) = sanitizeValue(value);

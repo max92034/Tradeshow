@@ -12,13 +12,43 @@ interface ProductState {
   loadSampleData: () => void;
 }
 
+function migrateProduct(p: Partial<Product>): Product {
+  return {
+    sku: p.sku || '',
+    description: p.description || '',
+    collection: p.collection || '',
+    location: p.location || '',
+    length: p.length || 0,
+    width: p.width || 0,
+    height: p.height || 0,
+    weight: p.weight || 0,
+    unit: p.unit || 'PC',
+    cartonQty: p.cartonQty || 0,
+    innerQty: p.innerQty || 0,
+    cartonL: p.cartonL || 0,
+    cartonW: p.cartonW || 0,
+    cartonH: p.cartonH || 0,
+    category: p.category || '',
+    subcategory: p.subcategory || '',
+    fobPrice: p.fobPrice || 0,
+    note: p.note || '',
+    imageUrl: p.imageUrl || '',
+    keyword: p.keyword || '',
+  };
+}
+
+function migrateProducts(products: Product[]): Product[] {
+  return products.map(p => migrateProduct(p));
+}
+
 export const useProductStore = create<ProductState>((set, get) => ({
   products: [],
   isLoaded: false,
   
   loadProducts: (products: Product[]) => {
-    set({ products, isLoaded: true });
-    saveToStorage(storageKeys.PRODUCTS, products);
+    const migrated = migrateProducts(products);
+    set({ products: migrated, isLoaded: true });
+    saveToStorage(storageKeys.PRODUCTS, migrated);
   },
   
   clearProducts: () => {
@@ -38,5 +68,6 @@ export const useProductStore = create<ProductState>((set, get) => ({
 
 const cachedProducts = loadFromStorage<Product[]>(storageKeys.PRODUCTS);
 if (cachedProducts && cachedProducts.length > 0) {
-  useProductStore.setState({ products: cachedProducts, isLoaded: true });
+  const migrated = migrateProducts(cachedProducts);
+  useProductStore.setState({ products: migrated, isLoaded: true });
 }

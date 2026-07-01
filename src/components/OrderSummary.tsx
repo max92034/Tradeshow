@@ -63,18 +63,28 @@ export function OrderSummary() {
       [],
     ];
 
-    const headers = ['SKU', 'Description', 'Unit Price'];
+    const headers = ['SKU', 'Collection', 'Description', 'Category', 'Subcategory', 'Unit Price', 'Qty', 'Weight (kg)', 'Carton L', 'Carton W', 'Carton H', 'Inner Qty', 'Carton Qty'];
     const rows = order.items.map(item => [
       item.sku,
+      item.collection || '',
       item.description,
+      item.category || '',
+      item.subcategory || '',
       item.unitPrice,
+      item.quantity,
+      item.weight || '',
+      item.cartonL || '',
+      item.cartonW || '',
+      item.cartonH || '',
+      item.innerQty || '',
+      item.cartonQty,
     ]);
 
     const totals = [
       [],
-      ['Subtotal', '', order.subtotal],
-      ['Total Items', '', order.totalItems],
-      ['Total Cartons (est.)', '', order.totalCartons],
+      ['Subtotal', '', '', '', '', order.subtotal],
+      ['Total Items', '', '', '', '', '', order.totalItems],
+      ['Total Cartons (est.)', '', '', '', '', '', '', '', '', '', '', '', order.totalCartons],
     ];
 
     const notesSection = order.buyer?.notes ? [

@@ -1,13 +1,30 @@
 export interface Product {
+  // Product Identification
   sku: string;
   description: string;
+  collection: string;
   location: string;
+
+  // Physical Specifications
   length: number;
   width: number;
   height: number;
-  fobPrice: number;
+  weight: number;
+
+  // Packaging
   unit: string;
   cartonQty: number;
+  innerQty: number;
+  cartonL: number;
+  cartonW: number;
+  cartonH: number;
+
+  // Categorization
+  category: string;
+  subcategory: string;
+
+  // Other
+  fobPrice: number;
   note: string;
   imageUrl: string;
   keyword: string;
@@ -31,6 +48,15 @@ export interface OrderItem {
   unitPrice: number;
   imageUrl: string;
   cartonQty: number;
+  // Additional product fields for quotation
+  collection: string;
+  weight: number;
+  cartonL: number;
+  cartonW: number;
+  cartonH: number;
+  innerQty: number;
+  category: string;
+  subcategory: string;
 }
 
 export interface Order {

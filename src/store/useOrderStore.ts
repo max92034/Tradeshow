@@ -34,7 +34,34 @@ function createEmptyOrder(): Order {
   };
 }
 
-const savedOrders = loadFromStorage<Order[]>(storageKeys.ORDERS) || [];
+function migrateOrderItem(item: Partial<OrderItem>): OrderItem {
+  return {
+    sku: item.sku || '',
+    description: item.description || '',
+    quantity: item.quantity || 0,
+    unitPrice: item.unitPrice || 0,
+    imageUrl: item.imageUrl || '',
+    cartonQty: item.cartonQty || 0,
+    collection: item.collection || '',
+    weight: item.weight || 0,
+    cartonL: item.cartonL || 0,
+    cartonW: item.cartonW || 0,
+    cartonH: item.cartonH || 0,
+    innerQty: item.innerQty || 0,
+    category: item.category || '',
+    subcategory: item.subcategory || '',
+  };
+}
+
+function migrateOrders(orders: Order[]): Order[] {
+  return orders.map(order => ({
+    ...order,
+    items: order.items.map(item => migrateOrderItem(item)),
+  }));
+}
+
+const rawSavedOrders = loadFromStorage<Order[]>(storageKeys.ORDERS);
+const savedOrders = rawSavedOrders ? migrateOrders(rawSavedOrders) : [];
 
 export const useOrderStore = create<OrderState>((set, get) => ({
   currentOrder: createEmptyOrder(),
@@ -55,6 +82,14 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         unitPrice: product.fobPrice,
         imageUrl: product.imageUrl,
         cartonQty: product.cartonQty,
+        collection: product.collection || '',
+        weight: product.weight || 0,
+        cartonL: product.cartonL || 0,
+        cartonW: product.cartonW || 0,
+        cartonH: product.cartonH || 0,
+        innerQty: product.innerQty || 0,
+        category: product.category || '',
+        subcategory: product.subcategory || '',
       };
       order.items = [...order.items, newItem];
     }
@@ -135,7 +170,11 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   loadOrder: (id: string) => {
     const order = get().savedOrders.find(o => o.id === id);
     if (order) {
-      set({ currentOrder: { ...order }, isDrawerOpen: true });
+      const migrated = {
+        ...order,
+        items: order.items.map(item => migrateOrderItem(item)),
+      };
+      set({ currentOrder: migrated, isDrawerOpen: true });
     }
   },
   
