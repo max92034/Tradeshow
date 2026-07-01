@@ -9,10 +9,11 @@ interface ProductCardProps {
   product: Product;
 }
 
-const SectionHeader = ({ icon: Icon, title, colorClass }: { icon: React.ElementType; title: string; colorClass: string }) => (
-  <div className={cn("flex items-center gap-1.5 px-2 py-1 rounded-md mb-2", colorClass)}>
-    <Icon size={12} strokeWidth={2.5} />
-    <span className="text-xs font-semibold uppercase tracking-wide">{title}</span>
+const InfoRow = ({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: React.ReactNode }) => (
+  <div className="flex items-center gap-2">
+    <Icon size={13} strokeWidth={1.5} className="text-slate-400 flex-shrink-0" />
+    <span className="text-xs text-slate-500">{label}</span>
+    <span className="text-xs font-medium text-slate-700 ml-auto truncate">{value}</span>
   </div>
 );
 
@@ -37,7 +38,7 @@ export const ProductCard = React.memo(function ProductCard({ product }: ProductC
 
   return (
     <div className="card card-hover overflow-hidden flex flex-col h-full group">
-      <div className="w-full h-44 sm:h-40 flex-shrink-0 bg-[var(--bg-secondary)] relative overflow-hidden">
+      <div className="relative w-full h-44 sm:h-40 flex-shrink-0 bg-slate-50 overflow-hidden">
         {product.imageUrl ? (
           <img
             src={product.imageUrl}
@@ -50,138 +51,112 @@ export const ProductCard = React.memo(function ProductCard({ product }: ProductC
             }}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)]">
+          <div className="w-full h-full flex items-center justify-center text-slate-300">
             <Package size={36} strokeWidth={1} />
           </div>
         )}
-      </div>
-      
-      <div className="flex-1 p-4 sm:p-5 flex flex-col gap-3 min-h-0">
-        {/* Product Identification Section */}
-        <SectionHeader 
-          icon={Tag} 
-          title="Product" 
-          colorClass="bg-violet-100 text-violet-700"
-        />
-        <div className="space-y-1.5">
-          {product.collection && (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide w-20">Collection</span>
-              <span className="text-xs font-medium text-[var(--text-primary)]">{product.collection}</span>
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide w-20">SKU</span>
-            <span className="badge bg-[var(--accent-soft)] text-[var(--accent)] font-mono font-bold tracking-wide text-[10px]">
-              {product.sku}
+        {product.collection && (
+          <div className="absolute top-3 left-3">
+            <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-medium bg-white/90 backdrop-blur-sm text-slate-600 rounded-full border border-slate-200/80 shadow-sm">
+              {product.collection}
             </span>
           </div>
-          <h3 className="font-display text-[15px] font-semibold text-[var(--text-primary)] leading-snug line-clamp-2">
-            {product.description}
-          </h3>
+        )}
+        <div className="absolute top-3 right-3">
+          <span className="font-mono text-[10px] font-bold tracking-wider bg-white/90 backdrop-blur-sm text-slate-700 px-2 py-0.5 rounded-md border border-slate-200/80 shadow-sm">
+            {product.sku}
+          </span>
+        </div>
+      </div>
+      
+      <div className="flex-1 p-4 flex flex-col min-h-0">
+        <h3 className="font-semibold text-[14px] text-slate-900 leading-snug line-clamp-2 mb-3">
+          {product.description}
+        </h3>
+        
+        <div className="space-y-2 mb-3">
+          {(product.length || product.width || product.height || product.weight) && (
+            <InfoRow 
+              icon={Ruler} 
+              label="Dims" 
+              value={
+                <span>
+                  {product.length || 0}×{product.width || 0}×{product.height || 0} cm
+                  {product.weight ? ` · ${product.weight} kg` : ''}
+                </span>
+              } 
+            />
+          )}
+          
           {product.location && (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide w-20">Location</span>
-              <span className="badge bg-[var(--bg-secondary)] text-[var(--text-secondary)]">
-                <MapPin size={10} />
-                {product.location}
-              </span>
-            </div>
+            <InfoRow 
+              icon={MapPin} 
+              label="Location" 
+              value={product.location} 
+            />
           )}
-        </div>
-        
-        {/* Physical Specifications Section */}
-        <SectionHeader 
-          icon={Ruler} 
-          title="Dimensions" 
-          colorClass="bg-emerald-100 text-emerald-700"
-        />
-        <div className="flex flex-wrap gap-1.5">
-          {product.length || product.width || product.height ? (
-            <span className="badge bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-[10px]">
-              {formatDimensions(product)}
-            </span>
-          ) : null}
-          {product.weight ? (
-            <span className="badge bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-[10px]">
-              {product.weight} kg
-            </span>
-          ) : null}
-        </div>
-        
-        {/* Packaging Section */}
-        <SectionHeader 
-          icon={Layers} 
-          title="Packaging" 
-          colorClass="bg-amber-100 text-amber-700"
-        />
-        <div className="flex flex-wrap gap-1.5">
-          {product.unit && (
-            <span className="badge bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-[10px]">
-              {product.unit}
-            </span>
+          
+          {product.unit && product.cartonQty > 0 && (
+            <InfoRow 
+              icon={Package} 
+              label="Pack" 
+              value={`${product.cartonQty} ${product.unit}/CTN`} 
+            />
           )}
-          {product.cartonQty > 0 && (
-            <span className="badge bg-amber-50 text-amber-700 text-[10px]">
-              <Package size={10} />
-              {formatCartonQty(product)}
-            </span>
-          )}
+          
           {product.innerQty > 0 && (
-            <span className="badge bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-[10px]">
-              Inner: {product.innerQty}
-            </span>
+            <InfoRow 
+              icon={Layers} 
+              label="Inner" 
+              value={`${product.innerQty} pcs`} 
+            />
           )}
-          {(product.cartonL || product.cartonW || product.cartonH) ? (
-            <span className="badge bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-[10px]">
-              Carton: {product.cartonL || 0}×{product.cartonW || 0}×{product.cartonH || 0} CM
-            </span>
-          ) : null}
-        </div>
-        
-        {/* Categorization Section */}
-        <SectionHeader 
-          icon={Tag} 
-          title="Category" 
-          colorClass="bg-rose-100 text-rose-700"
-        />
-        <div className="flex flex-wrap gap-1.5">
-          {product.category && (
-            <span className="badge bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-[10px]">
-              {product.category}
-            </span>
-          )}
-          {product.subcategory && (
-            <span className="badge bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-[10px]">
-              {product.subcategory}
-            </span>
+          
+          {(product.cartonL || product.cartonW || product.cartonH) && (
+            <InfoRow 
+              icon={Ruler} 
+              label="CTN" 
+              value={`${product.cartonL || 0}×${product.cartonW || 0}×${product.cartonH || 0} cm`} 
+            />
           )}
         </div>
         
-        {/* Price and Note */}
-        <div className="flex items-start justify-between gap-3 mt-auto">
-          <span className="font-display text-lg font-bold text-[var(--accent)] whitespace-nowrap flex-shrink-0">
+        {(product.category || product.subcategory) && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {product.category && (
+              <span className="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md font-medium">
+                {product.category}
+              </span>
+            )}
+            {product.subcategory && (
+              <span className="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-500 rounded-md">
+                {product.subcategory}
+              </span>
+            )}
+          </div>
+        )}
+        
+        {product.note && (
+          <p className="text-[11px] text-slate-400 italic line-clamp-1 mb-3">
+            {product.note}
+          </p>
+        )}
+        
+        <div className="mt-auto flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
+          <span className="text-lg font-bold text-slate-900">
             {formatPrice(product.fobPrice)}
           </span>
-          {product.note && (
-            <p className="text-xs text-[var(--text-muted)] italic line-clamp-1 flex-1 text-right">
-              Note: {product.note}
-            </p>
-          )}
-        </div>
-        
-        <div className="pt-2">
           <button
             onClick={handleAdd}
             className={cn(
-              "w-full py-2.5 px-4 rounded-full font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2",
+              "flex items-center justify-center gap-1.5 px-4 py-2 rounded-full font-medium text-sm transition-all duration-200",
               added
-                ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/25"
-                : "bg-[var(--accent)] text-white shadow-[0_2px_8px_rgba(232,93,42,0.2)] hover:bg-[var(--accent-hover)] hover:shadow-[0_4px_16px_rgba(232,93,42,0.3)] active:scale-[0.97]"
+                ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/30"
+                : "bg-slate-900 text-white hover:bg-slate-800 active:scale-[0.97]"
             )}
           >
-            <ShoppingCart size={16} strokeWidth={2} />
-            {added ? 'Added!' : 'Add to Quote'}
+            <ShoppingCart size={14} strokeWidth={2} />
+            {added ? 'Added' : 'Add'}
           </button>
         </div>
       </div>
