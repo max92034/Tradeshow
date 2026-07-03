@@ -3,7 +3,7 @@ import { Search, Mic, Upload, ShoppingCart, History, X, Settings, Menu, Sparkles
 import { VoiceIcon } from './VoiceIcon';
 import { useSearchStore } from '../store/useSearchStore';
 import { useOrderStore } from '../store/useOrderStore';
-import { useVoiceSearch } from '../hooks/useAzureVoiceSearch';
+import { useDeepgramVoiceSearch } from '../hooks/useDeepgramVoiceSearch';
 import { useDebounce } from '../hooks/useDebounce';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { cn } from '../lib/utils';
@@ -31,7 +31,7 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const { isListening, isSupported: voiceSupported, startListening, stopListening } = useVoiceSearch({
+  const { isListening, isSupported: voiceSupported, startListening, stopListening } = useDeepgramVoiceSearch({
     onResult: useCallback((text) => {
       setQuery(text);
       performSearch(text);

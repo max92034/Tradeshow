@@ -73,7 +73,9 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     const existing = order.items.find(i => i.sku === product.sku);
     
     if (existing) {
-      existing.quantity += qty;
+      order.items = order.items.map(i => 
+        i.sku === product.sku ? { ...i, quantity: i.quantity + qty } : i
+      );
     } else {
       const newItem: OrderItem = {
         sku: product.sku,
@@ -118,10 +120,9 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       return;
     }
     const order = { ...get().currentOrder };
-    const item = order.items.find(i => i.sku === sku);
-    if (item) {
-      item.quantity = qty;
-    }
+    order.items = order.items.map(i => 
+      i.sku === sku ? { ...i, quantity: qty } : i
+    );
     order.subtotal = calculateSubtotal(order.items);
     order.totalItems = calculateTotalItems(order.items);
     order.totalCartons = calculateTotalCartons(order.items);

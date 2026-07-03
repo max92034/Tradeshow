@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { User, ChevronDown, ChevronUp, Building2, Mail, Phone, Globe, FileText, Mic, Link } from 'lucide-react';
 import { useOrderStore } from '../store/useOrderStore';
 import { countries } from '../data/countries';
-import { useVoiceSearch } from '../hooks/useVoiceSearch';
+import { useDeepgramVoiceSearch } from '../hooks/useDeepgramVoiceSearch';
 import { cn } from '../lib/utils';
 
 export function BuyerInfoForm() {
@@ -13,7 +13,7 @@ export function BuyerInfoForm() {
   const setBuyer = useOrderStore(state => state.setBuyer);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const { isListening: isNoteListening, startListening: startNoteVoice, isSupported: voiceSupported } = useVoiceSearch({
+  const { isListening: isNoteListening, startListening: startNoteVoice, isSupported: voiceSupported } = useDeepgramVoiceSearch({
     onResult: (text) => {
       const current = buyer?.notes || '';
       setBuyer({ notes: current ? current + ' ' + text : text });

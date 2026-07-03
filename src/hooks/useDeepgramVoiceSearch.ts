@@ -6,7 +6,7 @@ interface UseVoiceSearchOptions {
   lang?: string;
 }
 
-export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
+export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
@@ -22,17 +22,16 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
   const audioContextRef = useRef<AudioContext | null>(null);
   const stopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isIOSRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     onResultRef.current = onResult;
   }, [onResult]);
 
   useEffect(() => {
-    // Check MediaRecorder support
     if (typeof MediaRecorder !== 'undefined' && typeof navigator !== 'undefined' && navigator.mediaDevices) {
       setIsSupported(true);
     }
-    // Detect iOS (including iPadOS 13+ which reports as Mac)
     if (typeof navigator !== 'undefined') {
       const ua = navigator.userAgent || '';
       const isIOSDevice = /iPad|iPhone|iPod/.test(ua) ||
@@ -44,6 +43,7 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
   useEffect(() => {
     return () => {
       if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop());
       }
@@ -54,72 +54,109 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
   }, []);
 
   function getApiUrl(): string {
-    if (typeof window === 'undefined') return '/api/speech';
-    const host = window.location.hostname;
+    const customUrl = import.meta.env.VITE_DEEPGRAM_API_URL;
+    if (customUrl) return customUrl;
+    
     const vercelApiUrl = import.meta.env.VITE_VERCEL_API_URL;
     if (vercelApiUrl) return vercelApiUrl + '/api/speech';
-    if (host.endsWith('github.io') || host === 'localhost') {
-      return 'https://tradeshow-sigma.vercel.app/api/speech';
+    
+    if (typeof window !== 'undefined') {
+      const host = window.location.hostname;
+      if (host.endsWith('github.io') || host === 'localhost') {
+        return 'https://tradeshow-sigma.vercel.app/api/speech';
+      }
     }
+    
     return '/api/speech';
   }
 
   function getBestAudioMimeType(): string {
+    const isIOS = isIOSRef.current;
+    
+    if (isIOS) {
+      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/mp4')) {
+        return 'audio/mp4';
+      }
+      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm')) {
+        return 'audio/webm';
+      }
+      return 'audio/mp4';
+    }
+    
     const types = [
-      'audio/mp4',
       'audio/webm;codecs=opus',
       'audio/webm',
+      'audio/mp4',
       'audio/ogg;codecs=opus',
       'audio/ogg',
     ];
+    
     for (const type of types) {
       if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(type)) {
         return type;
       }
     }
-    return '';
+    
+    return 'audio/webm';
   }
 
   const sendAudioForTranscription = useCallback(async (audioBlob: Blob, mimeType?: string) => {
     const apiUrl = getApiUrl();
     const voiceLanguage = useSettingsStore.getState().voiceLanguage;
 
-    const arrayBuffer = await audioBlob.arrayBuffer();
-
-    if (arrayBuffer.byteLength > 10 * 1024 * 1024) {
+    if (audioBlob.size > 10 * 1024 * 1024) {
       throw new Error('Audio too large - try recording shorter');
     }
 
-    const base64 = btoa(
-      new Uint8Array(arrayBuffer)
-        .reduce((data, byte) => data + String.fromCharCode(byte), '')
-    );
-
-    const payload = {
-      audio: base64,
-      language: lang || voiceLanguage,
-      mimeType: mimeType || 'audio/webm'
-    };
-
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.error || `Server error: ${response.status}`);
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
+    
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    
+    const timeoutId = setTimeout(() => {
+      abortController.abort();
+    }, 15000);
 
-    const result = await response.json();
+    const formData = new FormData();
+    formData.append('audio', audioBlob, `recording.${mimeType?.split('/')[1] || 'webm'}`);
+    formData.append('language', lang || voiceLanguage);
+    formData.append('mimeType', mimeType || 'audio/webm');
 
-    if (result.error) {
-      throw new Error(result.error);
-    } else if (result.text) {
-      return result.text;
-    } else {
-      throw new Error('No speech recognized - try speaking closer to the mic');
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        body: formData,
+        signal: abortController.signal,
+      });
+
+      if (response.status === 422) {
+        throw new Error('No speech recognized - try speaking clearer');
+      }
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Server error: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.error) {
+        throw new Error(result.error);
+      } else if (result.text) {
+        return result.text;
+      } else {
+        throw new Error('No speech recognized - try speaking closer to the mic');
+      }
+    } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') {
+        throw new Error('Request timed out - please retry');
+      }
+      throw e;
+    } finally {
+      clearTimeout(timeoutId);
+      abortControllerRef.current = null;
     }
   }, [lang]);
 
@@ -134,19 +171,21 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
       stopTimeoutRef.current = null;
     }
 
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
     setIsPreparing(true);
 
     const isIOS = isIOSRef.current;
 
     try {
-      // iOS: stop any leftover tracks before starting fresh
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop());
         streamRef.current = null;
       }
 
-      // Create/resume AudioContext BEFORE awaiting getUserMedia
-      // iOS requires AudioContext creation within the user gesture
       if (typeof window !== 'undefined') {
         const AC = window.AudioContext || (window as any).webkitAudioContext;
         if (AC) {
@@ -163,7 +202,6 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
         }
       }
 
-      // Get fresh stream (iOS can't cache streams)
       const constraints: MediaStreamConstraints = {
         audio: isIOS
           ? true
@@ -178,7 +216,6 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
 
-      // Verify audio track is live and enabled
       const audioTracks = stream.getAudioTracks();
       if (audioTracks.length === 0) {
         throw new Error('No audio track available');
@@ -186,7 +223,6 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
       const track = audioTracks[0];
       if (!track.enabled) track.enabled = true;
 
-      // Determine mime type
       const mimeType = getBestAudioMimeType();
       mimeTypeRef.current = mimeType;
 
@@ -198,7 +234,6 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
         recorderOptions.audioBitsPerSecond = 128000;
       }
 
-      // Always create new MediaRecorder (iOS can't restart stopped ones)
       const recorder = new MediaRecorder(stream, recorderOptions);
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
@@ -213,7 +248,6 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
         setIsListening(false);
         setIsProcessing(true);
 
-        // Brief wait for any late ondataavailable
         await new Promise(r => setTimeout(r, 100));
 
         if (audioChunksRef.current.length === 0) {
@@ -251,9 +285,6 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
         setIsPreparing(false);
       };
 
-      // iOS: use 100ms timeslice to ensure regular data delivery
-      // Without timeslice, iOS MediaRecorder may not produce data
-      // Desktop/Android: timeslice=0 means deliver all data on stop
       const timeslice = isIOS ? 100 : 0;
       recorder.start(timeslice);
 
@@ -294,7 +325,6 @@ export function useVoiceSearch({ onResult, lang }: UseVoiceSearchOptions) {
         }
       }
 
-      // iOS: stop stream tracks after recording completes
       if (isIOS) {
         setTimeout(() => {
           if (streamRef.current) {

@@ -1,7 +1,7 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { VoiceIcon } from './VoiceIcon';
-import { useVoiceSearch } from '../hooks/useAzureVoiceSearch';
+import { useDeepgramVoiceSearch } from '../hooks/useDeepgramVoiceSearch';
 import { useSearchStore } from '../store/useSearchStore';
 import { cn } from '../lib/utils';
 
@@ -11,7 +11,7 @@ export function VoiceSearchButton() {
   const [pressed, setPressed] = useState(false);
   const pressedRef = useRef(false);
 
-  const { isListening, isPreparing, isSupported, transcript, error, isProcessing, startListening, stopListening } = useVoiceSearch({
+  const { isListening, isPreparing, isSupported, transcript, error, isProcessing, startListening, stopListening } = useDeepgramVoiceSearch({
     onResult: useCallback((text) => {
       setQuery(text);
       performSearch(text);
@@ -43,24 +43,16 @@ export function VoiceSearchButton() {
 
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onCancel);
-    window.addEventListener('touchend', onUp);
-    window.addEventListener('touchcancel', onCancel);
 
     return () => {
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onCancel);
-      window.removeEventListener('touchend', onUp);
-      window.removeEventListener('touchcancel', onCancel);
     };
   }, [handleStop]);
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     e.stopPropagation();
-    handleStart();
-  }, [handleStart]);
-
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    e.stopPropagation();
+    e.preventDefault();
     handleStart();
   }, [handleStart]);
 
@@ -105,9 +97,8 @@ export function VoiceSearchButton() {
       <button
         type="button"
         onPointerDown={onPointerDown}
-        onTouchStart={onTouchStart}
         className={cn(
-          "w-20 h-20 rounded-full flex items-center justify-center shadow-2xl transition-all duration-200 select-none touch-manipulation relative",
+          "w-20 h-20 rounded-full flex items-center justify-center shadow-2xl transition-all duration-200 select-none touch-none relative",
           error
             ? "bg-amber-500 text-white"
             : isListening
