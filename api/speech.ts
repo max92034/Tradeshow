@@ -39,41 +39,68 @@ async function parseFormData(req: VercelRequest): Promise<{ audio: Buffer; langu
     }
     
     const boundary = '--' + boundaryMatch[1];
+    const boundaryBuffer = Buffer.from(boundary);
     
     req.on('data', (chunk) => chunks.push(chunk));
     req.on('end', () => {
       try {
-        const body = Buffer.concat(chunks).toString('utf-8');
-        const parts = body.split(boundary).filter(p => p.trim() && !p.includes('--'));
+        const body = Buffer.concat(chunks);
         
         let audioBuffer: Buffer | null = null;
         let language = '';
         let mimeType = '';
         
+        // Split by boundary while preserving binary data
+        const splitBody = (body: Buffer, boundary: Buffer): Buffer[] => {
+          const parts: Buffer[] = [];
+          let start = 0;
+          let idx = body.indexOf(boundary, start);
+          while (idx !== -1) {
+            if (idx > start) {
+              parts.push(body.slice(start, idx));
+            }
+            start = idx + boundary.length;
+            idx = body.indexOf(boundary, start);
+          }
+          if (start < body.length) {
+            parts.push(body.slice(start));
+          }
+          return parts.filter(p => p.length > 2 && !p.includes(Buffer.from('--')));
+        };
+        
+        const parts = splitBody(body, boundaryBuffer);
+        
         for (const part of parts) {
-          const headerEnd = part.indexOf('\r\n\r\n');
+          // Find header-content separation (two CRLF = \r\n\r\n)
+          let headerEnd = -1;
+          for (let i = 0; i < part.length - 3; i++) {
+            if (part[i] === 0x0D && part[i + 1] === 0x0A && 
+                part[i + 2] === 0x0D && part[i + 3] === 0x0A) {
+              headerEnd = i + 4;
+              break;
+            }
+          }
           if (headerEnd === -1) continue;
           
-          const header = part.substring(0, headerEnd);
-          const content = part.substring(headerEnd + 4);
+          const header = part.slice(0, headerEnd).toString('utf-8');
+          const contentBuffer = part.slice(headerEnd);
           
           if (header.includes('name="audio"')) {
-            const contentMatch = content.match(/^data:([^;]+);base64,([\s\S]*)$/);
-            if (contentMatch) {
-              mimeType = contentMatch[1];
-              audioBuffer = Buffer.from(contentMatch[2].replace(/\r\n/g, ''), 'base64');
-            } else {
-              const binaryContent = content.replace(/\r\n$/, '');
-              audioBuffer = Buffer.from(binaryContent, 'binary');
+            // Extract Content-Type from header to confirm
+            const contentTypeMatch = header.match(/Content-Type:\s*([^\r\n]+)/i);
+            if (contentTypeMatch) {
+              mimeType = contentTypeMatch[1].trim();
             }
+            // Content is already binary - just use it directly
+            audioBuffer = contentBuffer;
           } else if (header.includes('name="language"')) {
-            language = content.trim();
+            language = contentBuffer.toString('utf-8').trim();
           } else if (header.includes('name="mimeType"')) {
-            mimeType = content.trim();
+            mimeType = contentBuffer.toString('utf-8').trim();
           }
         }
         
-        if (!audioBuffer) {
+        if (!audioBuffer || audioBuffer.length === 0) {
           return reject(new Error('No audio data provided'));
         }
         
@@ -154,7 +181,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Audio too short - record for at least 1 second' });
     }
 
-    const audioContentType = mimeType || 'audio/webm';
+    const audioContentType = mimeType || (contentType.includes('multipart') ? 'audio/webm' : contentType);
 
     const lang = language === 'en' ? 'en' : 'zh';
 
@@ -184,7 +211,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .map(t => `keyterm=${encodeURIComponent(t)}`)
       .join('&');
 
-    const endpoint = `https://api.deepgram.com/v1/listen?model=nova-3&language=${lang}&smart_format=true&punctuate=true&numerals=true&${keytermParams}`;
+    const endpoint = `https://api.deepgram.com/v1/listen?model=nova-3&language=${lang}&smart_format=true&punctuate=true&numerals=true&noise_reduction=true&${keytermParams}`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);

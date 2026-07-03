@@ -166,6 +166,20 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
     setIsProcessing(false);
     audioChunksRef.current = [];
 
+    // --- CHANGED: Force-stop existing recorder immediately ---
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch { /* already stopping */ }
+      mediaRecorderRef.current = null;
+    }
+    // Also clean up all stream tracks immediately
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    // --- END CHANGED ---
+
     if (stopTimeoutRef.current) {
       clearTimeout(stopTimeoutRef.current);
       stopTimeoutRef.current = null;
@@ -216,6 +230,20 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
 
+      // --- NEW: Keep iOS audio session alive ---
+      if (isIOS && audioContextRef.current) {
+        try {
+          const source = audioContextRef.current.createMediaStreamSource(stream);
+          const gain = audioContextRef.current.createGain();
+          gain.gain.value = 0; // silent
+          source.connect(gain);
+          gain.connect(audioContextRef.current.destination);
+        } catch {
+          // non-critical — recording still works without this
+        }
+      }
+      // --- END NEW ---
+
       const audioTracks = stream.getAudioTracks();
       if (audioTracks.length === 0) {
         throw new Error('No audio track available');
@@ -234,7 +262,18 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
         recorderOptions.audioBitsPerSecond = 128000;
       }
 
-      const recorder = new MediaRecorder(stream, recorderOptions);
+      // --- CHANGED: Try preferred MIME, fallback to default ---
+      let recorder: MediaRecorder;
+      try {
+        recorder = new MediaRecorder(stream, recorderOptions);
+      } catch {
+        // Fallback: let browser pick default MIME type
+        recorder = new MediaRecorder(stream);
+      }
+      // Capture actual MIME type from the created recorder
+      mimeTypeRef.current = recorder.mimeType || mimeTypeRef.current || 'audio/webm';
+      // --- END CHANGED ---
+
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
 
