@@ -9,6 +9,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { Readable } from 'stream';
 
 const ALLOWED_ORIGINS = [
   /^https:\/\/.*\.vercel\.app$/,
@@ -26,6 +27,71 @@ function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Access-Control-Max-Age', '86400');
 }
+
+async function parseFormData(req: VercelRequest): Promise<{ audio: Buffer; language: string; mimeType: string }> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    const contentType = req.headers['content-type'] || '';
+    const boundaryMatch = contentType.match(/boundary=(.+)/);
+    
+    if (!boundaryMatch) {
+      return reject(new Error('Missing multipart boundary'));
+    }
+    
+    const boundary = '--' + boundaryMatch[1];
+    
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => {
+      try {
+        const body = Buffer.concat(chunks).toString('utf-8');
+        const parts = body.split(boundary).filter(p => p.trim() && !p.includes('--'));
+        
+        let audioBuffer: Buffer | null = null;
+        let language = '';
+        let mimeType = '';
+        
+        for (const part of parts) {
+          const headerEnd = part.indexOf('\r\n\r\n');
+          if (headerEnd === -1) continue;
+          
+          const header = part.substring(0, headerEnd);
+          const content = part.substring(headerEnd + 4);
+          
+          if (header.includes('name="audio"')) {
+            const contentMatch = content.match(/^data:([^;]+);base64,([\s\S]*)$/);
+            if (contentMatch) {
+              mimeType = contentMatch[1];
+              audioBuffer = Buffer.from(contentMatch[2].replace(/\r\n/g, ''), 'base64');
+            } else {
+              const binaryContent = content.replace(/\r\n$/, '');
+              audioBuffer = Buffer.from(binaryContent, 'binary');
+            }
+          } else if (header.includes('name="language"')) {
+            language = content.trim();
+          } else if (header.includes('name="mimeType"')) {
+            mimeType = content.trim();
+          }
+        }
+        
+        if (!audioBuffer) {
+          return reject(new Error('No audio data provided'));
+        }
+        
+        resolve({ audio: audioBuffer, language, mimeType });
+      } catch (err) {
+        reject(err);
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+export const config = {
+  api: {
+    bodyParser: false,
+    responseLimit: '10mb',
+  },
+};
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(req, res);
@@ -47,18 +113,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { audio, language, mimeType } = req.body;
-
-    if (!audio) {
-      return res.status(400).json({ error: 'No audio data provided' });
-    }
-
-    // Decode base64 audio
     let audioBuffer: Buffer;
-    try {
-      audioBuffer = Buffer.from(audio, 'base64');
-    } catch {
-      return res.status(400).json({ error: 'Invalid audio data format' });
+    let language: string;
+    let mimeType: string;
+    
+    const contentType = req.headers['content-type'] || '';
+    
+    if (contentType.includes('multipart/form-data')) {
+      ({ audio: audioBuffer, language, mimeType } = await parseFormData(req));
+    } else if (contentType.includes('application/json')) {
+      const body = await new Promise<{ audio: string; language?: string; mimeType?: string }>((resolve, reject) => {
+        let data = '';
+        req.on('data', chunk => data += chunk);
+        req.on('end', () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch (e) {
+            reject(e);
+          }
+        });
+        req.on('error', reject);
+      });
+      
+      if (!body.audio) {
+        return res.status(400).json({ error: 'No audio data provided' });
+      }
+      
+      audioBuffer = Buffer.from(body.audio, 'base64');
+      language = body.language || '';
+      mimeType = body.mimeType || '';
+    } else {
+      return res.status(400).json({ error: 'Unsupported content type' });
     }
 
     if (audioBuffer.length === 0) {
@@ -69,15 +154,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Audio too short - record for at least 1 second' });
     }
 
-    // Determine content type from mimeType or default
-    const contentType = mimeType || 'audio/webm';
+    const audioContentType = mimeType || 'audio/webm';
 
-    // Use the specified language, default to Chinese
     const lang = language === 'en' ? 'en' : 'zh';
 
-    // Keyterm prompting boosts recognition accuracy for important terms.
-    // Since we only want number recognition, we heavily boost ALL digit patterns
-    // so the model strongly prefers number words over similar-sounding characters.
     const zhDigits = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
     const keyterms: string[] = lang === 'zh'
       ? [
@@ -104,42 +184,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .map(t => `keyterm=${encodeURIComponent(t)}`)
       .join('&');
 
-    // numerals=true converts spoken numbers to digits.
-    // We request nova-3 with the full Mandarin model variant for best Chinese accuracy.
     const endpoint = `https://api.deepgram.com/v1/listen?model=nova-3&language=${lang}&smart_format=true&punctuate=true&numerals=true&${keytermParams}`;
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Token ${apiKey}`,
-        'Content-Type': contentType,
-      },
-      body: audioBuffer,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Deepgram error:', response.status, errorText);
-      return res.status(response.status).json({ error: `Deepgram error: ${response.status}` });
-    }
-
-    const result = await response.json();
-    let transcript = result?.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
-    const confidence = result?.results?.channels?.[0]?.alternatives?.[0]?.confidence || 0;
-
-    // Extract only digits and hyphens/underscores for SKU number search
-    // This applies to both English and Chinese - ONLY numbers are returned
-    const cleanedTranscript = transcript
-      .replace(/[^\d\-_]/g, '')
-      .trim();
-
-    if (cleanedTranscript.length > 0) {
-      return res.status(200).json({ text: cleanedTranscript, confidence });
-    } else {
-      return res.status(200).json({
-        text: '',
-        error: 'Only numbers are recognized. Please speak digits 0-9.',
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${apiKey}`,
+          'Content-Type': audioContentType,
+        },
+        body: audioBuffer,
+        signal: controller.signal,
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Deepgram error:', response.status, errorText);
+        return res.status(response.status).json({ error: `Deepgram error: ${response.status}` });
+      }
+
+      const result = await response.json();
+      let transcript = result?.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
+      const confidence = result?.results?.channels?.[0]?.alternatives?.[0]?.confidence || 0;
+
+      const cleanedTranscript = transcript
+        .replace(/[^\d\-_]/g, '')
+        .trim();
+
+      if (cleanedTranscript.length > 0) {
+        return res.status(200).json({ text: cleanedTranscript, confidence });
+      } else {
+        return res.status(200).json({
+          text: '',
+          error: 'Only numbers are recognized. Please speak digits 0-9.',
+        });
+      }
+    } finally {
+      clearTimeout(timeoutId);
     }
   } catch (error) {
     console.error('Speech API error:', error);
