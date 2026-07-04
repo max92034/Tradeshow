@@ -1,8 +1,7 @@
-import { X, History, Trash2, ChevronRight, Calendar, Package } from 'lucide-react';
+import { X, History, Trash2, Calendar, Package } from 'lucide-react';
 import { useOrderStore } from '../store/useOrderStore';
 import { formatPrice } from '../utils/formatters';
 import { Order } from '../types';
-import { getCountryByCode } from '../data/countries';
 import { cn } from '../lib/utils';
 
 interface OrderHistoryModalProps {
@@ -40,115 +39,134 @@ export function OrderHistoryModal({ isOpen, onClose }: OrderHistoryModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-3xl shadow-2xl max-h-[85vh] flex flex-col animate-slide-up">
-        <div className="flex items-center justify-between p-4 border-b border-slate-200 flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <History size={20} className="text-cyan-600" />
-            <h2 className="text-lg font-bold text-slate-800">Saved Quotations</h2>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-modal">
+      <div
+        className="bg-[var(--bg-card)] w-full sm:max-w-lg sm:rounded-xl rounded-t-xl sm:shadow-xl shadow-2xl max-h-[85vh] flex flex-col animate-slide-up sm:animate-scale-enter"
+      >
+        <div className="flex items-center justify-between px-6 py-6 pb-4 border-b border-[var(--border-soft)] flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div
+              className="w-10 h-10 rounded-lg flex items-center justify-center"
+              style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+            >
+              <History size={20} />
+            </div>
+            <h2
+              className="font-semibold"
+              style={{ fontSize: 'var(--text-h3)', color: 'var(--text-primary)' }}
+            >
+              Saved Quotations
+            </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
+            className="icon-btn text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]"
+            aria-label="Close"
           >
             <X size={20} />
           </button>
         </div>
-        
-        <div className="flex-1 overflow-y-auto p-3">
+
+        <div className="flex-1 overflow-y-auto px-6 py-4" style={{ maxHeight: '70vh' }}>
           {savedOrders.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-              <History size={48} strokeWidth={1} className="mb-3" />
-              <p className="font-medium text-slate-600">No saved quotations</p>
-              <p className="text-sm mt-1">Quotations you save will appear here</p>
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <History
+                size={48}
+                strokeWidth={1}
+                style={{ color: 'var(--text-muted)' }}
+                className="mb-4"
+              />
+              <p
+                className="font-medium mb-1"
+                style={{ fontSize: 'var(--text-body)', color: 'var(--text-primary)' }}
+              >
+                No saved quotations
+              </p>
+              <p style={{ fontSize: 'var(--text-small)', color: 'var(--text-muted)' }}>
+                Quotations you save will appear here
+              </p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {savedOrders.map(order => {
-                const country = getCountryByCode(order.buyer?.nationality || '');
-                const previewItems = order.items.slice(0, 3);
-                const extraCount = order.items.length - previewItems.length;
-                
-                return (
-                  <div
-                    key={order.id}
-                    onClick={() => handleLoad(order)}
-                    className={cn(
-                      "p-3 bg-white border border-slate-200 rounded-xl cursor-pointer",
-                      "hover:border-cyan-300 hover:shadow-sm transition-all group"
-                    )}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-12 h-12 bg-cyan-100 rounded-lg flex items-center justify-center">
-                        <span className="text-cyan-700 font-bold text-sm">
-                          {country?.code || 'N/A'}
-                        </span>
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            <p className="font-semibold text-slate-800 truncate">
-                              {order.buyer?.company || 'Untitled'}
-                            </p>
-                            {order.buyer?.name && (
-                              <p className="text-sm text-slate-500 truncate">
-                                {order.buyer.name}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <button
-                              onClick={(e) => handleDelete(e, order.id)}
-                              className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                            <ChevronRight size={18} className="text-slate-400" />
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
-                          <span className="inline-flex items-center gap-1">
-                            <Calendar size={12} />
-                            {formatDate(order.updatedAt)}
-                          </span>
-                          <span className="inline-flex items-center gap-1">
-                            <Package size={12} />
-                            {order.items.length} items
-                          </span>
-                          <span className="font-semibold text-emerald-600 ml-auto">
-                            {formatPrice(order.subtotal)}
-                          </span>
-                        </div>
-                        
-                        <div className="mt-2.5 space-y-1">
-                          {previewItems.map(item => (
-                            <div key={item.sku} className="flex items-center gap-2 text-xs">
-                              <span className="font-mono text-cyan-600 font-medium flex-shrink-0">
-                                {item.sku}
-                              </span>
-                              <span className="text-slate-600 truncate flex-1">
-                                {item.description}
-                              </span>
-                              <span className="text-slate-500 flex-shrink-0">
-                                {formatPrice(item.unitPrice)}
-                              </span>
-                            </div>
-                          ))}
-                          {extraCount > 0 && (
-                            <p className="text-xs text-slate-400 italic">
-                              +{extraCount} more item{extraCount > 1 ? 's' : ''}...
-                            </p>
-                          )}
-                        </div>
-                      </div>
+            <div className="space-y-3">
+              {savedOrders.map(order => (
+                <div
+                  key={order.id}
+                  className={cn(
+                    'p-4 rounded-lg transition-all duration-150 cursor-pointer',
+                    'hover:bg-[var(--bg-elevated)]'
+                  )}
+                  style={{ background: 'var(--bg-secondary)' }}
+                  onClick={() => handleLoad(order)}
+                >
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className="font-semibold truncate"
+                        style={{ fontSize: 'var(--text-body)', color: 'var(--text-primary)' }}
+                      >
+                        {order.buyer?.company || 'Untitled'}
+                      </p>
+                      {order.buyer?.name && (
+                        <p
+                          className="truncate mt-0.5"
+                          style={{ fontSize: 'var(--text-small)', color: 'var(--text-secondary)' }}
+                        >
+                          {order.buyer.name}
+                        </p>
+                      )}
+                    </div>
+                    <div
+                      className="font-mono font-bold flex-shrink-0"
+                      style={{ fontSize: 'var(--text-body)', color: 'var(--accent)' }}
+                    >
+                      {formatPrice(order.subtotal)}
                     </div>
                   </div>
-                );
-              })}
+
+                  <div
+                    className="flex items-center gap-4 mb-3"
+                    style={{ fontSize: 'var(--text-small)', color: 'var(--text-muted)' }}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <Calendar size={14} />
+                      {formatDate(order.updatedAt)}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Package size={14} />
+                      {order.items.length} items
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-3 border-t border-[var(--border-soft)]">
+                    <button
+                      onClick={() => handleLoad(order)}
+                      className="btn-primary flex-1 text-sm"
+                      style={{ paddingTop: '8px', paddingBottom: '8px' }}
+                    >
+                      Load
+                    </button>
+                    <button
+                      onClick={(e) => handleDelete(e, order.id)}
+                      className="btn-ghost"
+                      style={{ color: 'var(--danger)' }}
+                    >
+                      <Trash2 size={18} />
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
+        </div>
+
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border-soft)] flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="btn-ghost"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>

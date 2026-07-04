@@ -1,14 +1,14 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
-import { AlertCircle, Loader2 } from 'lucide-react';
-import { VoiceIcon } from './VoiceIcon';
+import { Mic, Check, Loader2 } from 'lucide-react';
 import { useDeepgramVoiceSearch } from '../hooks/useDeepgramVoiceSearch';
 import { useSearchStore } from '../store/useSearchStore';
 import { cn } from '../lib/utils';
 
+type VoiceState = 'idle' | 'preparing' | 'listening' | 'processing' | 'success' | 'error';
+
 export function VoiceSearchButton() {
   const setQuery = useSearchStore(state => state.setQuery);
   const performSearch = useSearchStore(state => state.performSearch);
-  const [pressed, setPressed] = useState(false);
   const pressedRef = useRef(false);
 
   const { isListening, isPreparing, isSupported, transcript, error, isProcessing, startListening, stopListening } = useDeepgramVoiceSearch({
@@ -18,10 +18,58 @@ export function VoiceSearchButton() {
     }, [setQuery, performSearch]),
   });
 
+  const [displayError, setDisplayError] = useState<string | null>(null);
+  const [displayTranscript, setDisplayTranscript] = useState<string | null>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const transcriptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (error) {
+      setDisplayError(error);
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = setTimeout(() => {
+        setDisplayError(null);
+      }, 3000);
+    }
+    return () => {
+      if (errorTimerRef.current) {
+        clearTimeout(errorTimerRef.current);
+      }
+    };
+  }, [error]);
+
+  useEffect(() => {
+    if (transcript && !isProcessing) {
+      setDisplayTranscript(transcript);
+      if (transcriptTimerRef.current) clearTimeout(transcriptTimerRef.current);
+      transcriptTimerRef.current = setTimeout(() => {
+        setDisplayTranscript(null);
+      }, 1500);
+    }
+    return () => {
+      if (transcriptTimerRef.current) {
+        clearTimeout(transcriptTimerRef.current);
+      }
+    };
+  }, [transcript, isProcessing]);
+
+  const getState = (): VoiceState => {
+    if (displayError) return 'error';
+    if (displayTranscript && !isProcessing) return 'success';
+    if (isProcessing) return 'processing';
+    if (isListening) return 'listening';
+    if (isPreparing) return 'preparing';
+    return 'idle';
+  };
+
+  const state = getState();
+
   const handleStart = useCallback(() => {
     if (pressedRef.current) return;
     pressedRef.current = true;
-    setPressed(true);
+
+    setDisplayError(null);
+    setDisplayTranscript(null);
 
     if (document.activeElement && document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
@@ -33,7 +81,6 @@ export function VoiceSearchButton() {
   const handleStop = useCallback(() => {
     if (!pressedRef.current) return;
     pressedRef.current = false;
-    setPressed(false);
     stopListening();
   }, [stopListening]);
 
@@ -58,69 +105,85 @@ export function VoiceSearchButton() {
 
   if (!isSupported) {
     return (
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 sm:hidden">
-        <div className="px-4 py-2 rounded-xl text-sm bg-amber-500 text-white text-center shadow-lg">
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+        <div className="px-4 py-2 rounded-xl text-sm bg-[var(--warning)] text-[var(--text-inverse)] text-center shadow-lg">
           Voice not supported
         </div>
       </div>
     );
   }
 
-  const showIndicator = isListening || isPreparing || isProcessing || error || transcript;
+  const showIndicator = state !== 'idle';
+  const isErrorState = state === 'error';
+  const isSuccessState = state === 'success';
+
+  const bgClass = {
+    idle: 'bg-[var(--accent)]',
+    preparing: 'bg-[var(--bg-secondary)]',
+    listening: 'bg-[var(--danger)]',
+    processing: 'bg-[var(--warning)]',
+    success: 'bg-[var(--success)]',
+    error: 'bg-[var(--danger)]',
+  }[state];
+
+  const iconColor = state === 'preparing' || state === 'processing'
+    ? 'text-[var(--text-primary)]'
+    : 'text-[var(--text-inverse)]';
+
+  const renderIcon = () => {
+    if (state === 'success') {
+      return <Check size={28} strokeWidth={2.5} className={iconColor} />;
+    }
+    if (state === 'processing') {
+      return <Loader2 size={28} className={cn(iconColor, 'animate-spin-slow')} />;
+    }
+    return <Mic size={28} strokeWidth={2} className={iconColor} />;
+  };
+
+  const indicatorText = isErrorState
+    ? displayError
+    : isSuccessState
+    ? displayTranscript
+    : state === 'preparing'
+    ? 'Preparing...'
+    : state === 'listening'
+    ? 'Listening...'
+    : state === 'processing'
+    ? 'Processing...'
+    : '';
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-3 sm:hidden">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center">
       {showIndicator && (
-        <div className={cn(
-          "px-4 py-3 rounded-2xl text-sm max-w-[80vw] text-center shadow-xl font-medium",
-          error ? "bg-red-500 text-white" : "bg-[var(--text-primary)] text-white"
-        )}>
-          {error ? (
-            <div className="flex flex-col items-center gap-1">
-              <AlertCircle size={20} />
-              <span>{error}</span>
-            </div>
-          ) : isProcessing ? (
-            <span>Processing...</span>
-          ) : isPreparing ? (
-            <div className="flex flex-col items-center gap-1">
-              <Loader2 size={20} className="animate-spin" />
-              <span>Preparing mic...</span>
-            </div>
-          ) : transcript ? (
-            <span>{transcript}</span>
-          ) : (
-            <span>Recording... speak now</span>
+        <div
+          className={cn(
+            "absolute bottom-20 px-4 py-2 rounded-xl shadow-lg text-sm max-w-[80vw] text-center whitespace-nowrap transition-opacity duration-200",
+            isErrorState
+              ? "bg-[var(--danger)] text-[var(--text-inverse)]"
+              : "bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-soft)]"
           )}
+          style={{ bottom: '80px' }}
+        >
+          {indicatorText}
         </div>
       )}
+
       <button
         type="button"
         onPointerDown={onPointerDown}
         className={cn(
-          "w-20 h-20 rounded-full flex items-center justify-center shadow-2xl transition-all duration-200 select-none touch-none relative",
-          error
-            ? "bg-amber-500 text-white"
-            : isListening
-              ? "bg-[#e85d2a] text-white scale-110"
-              : isProcessing
-                ? "bg-[var(--text-secondary)] text-white scale-105"
-                : isPreparing
-                  ? "bg-[var(--text-secondary)] text-white animate-pulse"
-                  : pressed
-                    ? "bg-[#1a9cd8] text-white scale-95"
-                    : "bg-[#2aace8] text-white active:scale-95 shadow-lg shadow-[#2aace8]/30"
+          "w-16 h-16 rounded-full flex items-center justify-center shadow-lg touch-none relative transition-all duration-200 select-none",
+          bgClass,
+          state === 'preparing' && 'animate-pulse',
+          state === 'error' && 'animate-shake'
         )}
         aria-label="Hold to voice search"
       >
-        <VoiceIcon size={32} active={isListening || isProcessing} />
-        {(isListening || isProcessing) && (
-          <span className="absolute inset-0 rounded-full bg-[#e85d2a] animate-ping opacity-40" />
+        {state === 'listening' && (
+          <span className="absolute inset-0 rounded-full bg-[var(--danger)] animate-pulse-ring" />
         )}
+        {renderIcon()}
       </button>
-      <p className="text-xs text-[var(--text-muted)] font-medium text-center">
-        {isProcessing ? "Processing voice..." : isListening ? "Release to search" : isPreparing ? "Starting mic..." : error ? "Press and hold to retry" : "Hold to speak"}
-      </p>
     </div>
   );
 }

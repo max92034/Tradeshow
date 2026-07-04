@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Save, FileSpreadsheet, Mail, Send, Check, AlertTriangle } from 'lucide-react';
+import { Download, Mail, FileText, AlertTriangle } from 'lucide-react';
 import { useOrderStore } from '../store/useOrderStore';
 import { useToast } from './Toast';
 import { formatPrice } from '../utils/formatters';
@@ -18,8 +17,7 @@ function validateBuyer(buyer: ReturnType<typeof useOrderStore.getState>['current
 
 export function OrderSummary() {
   const order = useOrderStore(state => state.currentOrder);
-  const saveOrder = useOrderStore(state => state.saveOrder);
-  const [saved, setSaved] = useState(false);
+  const newOrder = useOrderStore(state => state.newOrder);
   const { addToast } = useToast();
 
   const canProceed = () => {
@@ -36,14 +34,6 @@ export function OrderSummary() {
     }
     
     return true;
-  };
-
-  const handleSave = () => {
-    if (!canProceed()) return;
-    saveOrder();
-    setSaved(true);
-    addToast('Quotation saved successfully!', 'success');
-    setTimeout(() => setSaved(false), 2000);
   };
 
   const handleExportExcel = () => {
@@ -135,64 +125,101 @@ export function OrderSummary() {
     window.location.href = mailto;
   };
 
+  const handleNewQuote = () => {
+    newOrder();
+    addToast('New quotation started', 'success');
+  };
+
   const missingFields = validateBuyer(order.buyer);
 
   return (
-    <div className="bg-white border-t border-slate-200 p-4 space-y-3">
-      {missingFields.length > 0 && (
-        <div className="flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
-          <AlertTriangle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
-          <div className="text-xs text-amber-800">
-            <span className="font-semibold">Missing required fields:</span>
-            <span className="ml-1">{missingFields.join(', ')}</span>
+    <div 
+      className="sticky bottom-0 border-t border-[var(--border-soft)]"
+      style={{ background: 'var(--bg-card)' }}
+    >
+      <div className="px-4 pt-4 pb-4 space-y-4" style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
+        {missingFields.length > 0 && (
+          <div 
+            className="flex items-start gap-2 p-3 rounded-lg border"
+            style={{ 
+              background: 'color-mix(in srgb, var(--warning) 10%, transparent)',
+              borderColor: 'color-mix(in srgb, var(--warning) 30%, transparent)',
+            }}
+          >
+            <AlertTriangle size={16} style={{ color: 'var(--warning)' }} className="flex-shrink-0 mt-0.5" />
+            <div className="text-xs" style={{ color: 'var(--text-primary)' }}>
+              <span className="font-semibold">Missing required fields:</span>
+              <span className="ml-1">{missingFields.join(', ')}</span>
+            </div>
+          </div>
+        )}
+        
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-body)' }}>
+              Subtotal
+            </span>
+            <span 
+              className="font-mono font-semibold"
+              style={{ color: 'var(--accent)', fontSize: 'var(--text-body)' }}
+            >
+              {formatPrice(order.subtotal)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-small)' }}>
+              Total Items
+            </span>
+            <span 
+              className="font-medium"
+              style={{ color: 'var(--text-primary)', fontSize: 'var(--text-small)' }}
+            >
+              {order.totalItems} pcs
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-small)' }}>
+              Total Cartons
+            </span>
+            <span 
+              className="font-medium"
+              style={{ color: 'var(--text-primary)', fontSize: 'var(--text-small)' }}
+            >
+              {order.totalCartons} ctns
+            </span>
           </div>
         </div>
-      )}
-      
-      <div className="space-y-1.5 text-sm">
-        <div className="flex justify-between text-slate-600">
-          <span>Items</span>
-          <span className="font-medium">{order.totalItems} pcs</span>
-        </div>
-        <div className="flex justify-between text-slate-600">
-          <span>Cartons (est.)</span>
-          <span className="font-medium">{order.totalCartons} ctns</span>
-        </div>
-        <div className="flex justify-between text-lg font-bold text-slate-900 pt-2 border-t border-slate-200">
-          <span>Subtotal</span>
-          <span className="text-emerald-600">{formatPrice(order.subtotal)}</span>
+        
+        <div className="space-y-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button
+              onClick={handleExportExcel}
+              className="btn-primary w-full"
+            >
+              <Download size={18} />
+              Export Excel
+            </button>
+            <button
+              onClick={handleEmail}
+              className="btn-secondary w-full"
+            >
+              <Mail size={18} />
+              Email Quote
+            </button>
+          </div>
+          <button
+            onClick={handleNewQuote}
+            className={cn(
+              "w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all duration-150 active:scale-[0.97]",
+              "bg-transparent hover:bg-[var(--danger)]/10"
+            )}
+            style={{ color: 'var(--danger)' }}
+          >
+            <FileText size={18} />
+            New Quote
+          </button>
         </div>
       </div>
-      
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          onClick={handleSave}
-          className={cn(
-            "flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg font-semibold text-sm transition-all",
-            saved
-              ? "bg-emerald-500 text-white"
-              : "bg-slate-800 hover:bg-slate-900 text-white active:scale-95"
-          )}
-        >
-          {saved ? <Check size={18} /> : <Save size={16} />}
-          {saved ? 'Saved!' : 'Save Quote'}
-        </button>
-        <button
-          onClick={handleExportExcel}
-          className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg font-semibold text-sm bg-cyan-600 hover:bg-cyan-700 text-white transition-all active:scale-95"
-        >
-          <FileSpreadsheet size={16} />
-          Export
-        </button>
-      </div>
-      
-      <button
-        onClick={handleEmail}
-        className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-semibold text-sm bg-emerald-600 hover:bg-emerald-700 text-white transition-all active:scale-95"
-      >
-        <Send size={16} />
-        Send via Email
-      </button>
     </div>
   );
 }

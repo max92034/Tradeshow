@@ -8,9 +8,8 @@ export default function App() {
   const theme = useSettingsStore(state => state.theme);
 
   useEffect(() => {
-    const root = document.documentElement;
-    root.classList.remove('theme-minimal', 'theme-trumpian');
-    root.classList.add(`theme-${theme}`);
+    document.documentElement.classList.remove('theme-light', 'theme-dark', 'theme-gold', 'theme-minimal', 'theme-trumpian');
+    document.documentElement.classList.add(`theme-${theme}`);
   }, [theme]);
 
   return (
