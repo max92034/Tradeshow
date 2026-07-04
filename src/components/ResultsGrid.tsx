@@ -173,7 +173,7 @@ export const ResultsGrid = React.memo(function ResultsGrid({ products, isLoading
                 key={i}
                 className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-soft)] overflow-hidden"
               >
-                <div className="aspect-[4/3] bg-[var(--bg-secondary)] animate-shimmer rounded-t-xl" />
+                <div className="aspect-square bg-[var(--bg-secondary)] animate-shimmer rounded-t-xl" />
                 <div className="p-4 space-y-3">
                   <div className="h-2 bg-[var(--bg-secondary)] animate-shimmer rounded-full w-full" />
                   <div className="h-2 bg-[var(--bg-secondary)] animate-shimmer rounded-full w-4/5" />

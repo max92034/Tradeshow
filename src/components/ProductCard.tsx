@@ -83,7 +83,7 @@ export const ProductCard = React.memo(function ProductCard({ product }: ProductC
       <div
         className="relative w-full overflow-hidden"
         style={{
-          aspectRatio: '4/3',
+          aspectRatio: '1/1',
           borderTopLeftRadius: 'var(--radius-lg)',
           borderTopRightRadius: 'var(--radius-lg)',
         }}
