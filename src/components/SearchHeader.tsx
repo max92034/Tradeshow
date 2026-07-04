@@ -358,18 +358,17 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
 
             <button
               onClick={onSettingsClick}
-              className="hidden sm:inline-flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 active:scale-95"
+              className="hidden sm:inline-flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 active:scale-95 shadow-sm"
               style={{
-                color: 'var(--text-secondary)',
-                backgroundColor: 'var(--bg-secondary)',
+                color: 'var(--text-inverse)',
+                backgroundColor: 'var(--accent)',
+                boxShadow: '0 2px 8px color-mix(in srgb, var(--accent) 20%, transparent)',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--bg-elevated)';
-                e.currentTarget.style.color = 'var(--text-primary)';
+                e.currentTarget.style.transform = 'scale(1.05)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
-                e.currentTarget.style.color = 'var(--text-secondary)';
+                e.currentTarget.style.transform = 'scale(1)';
               }}
               aria-label="Open settings"
             >
