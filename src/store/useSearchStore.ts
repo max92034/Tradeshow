@@ -24,10 +24,21 @@ function buildSearchableText(product: Product): string {
   );
 }
 
+// Rebuilding the lowercased search text for the whole catalog on every
+// keystroke is O(products × fields); cache it and rebuild only when the
+// catalog actually changes.
+let cachedSearchTexts: string[] = [];
+let searchTextVersion = -1;
+let searchTextProducts: Product[] | null = null;
+
 function getProductsWithSearchText(): { products: Product[]; searchTexts: string[]; version: number } {
   const { products, version } = useProductStore.getState() as { products: Product[]; version: number };
-  const searchTexts = products.map(buildSearchableText);
-  return { products, searchTexts, version };
+  if (version !== searchTextVersion || products !== searchTextProducts) {
+    cachedSearchTexts = products.map(buildSearchableText);
+    searchTextVersion = version;
+    searchTextProducts = products;
+  }
+  return { products, searchTexts: cachedSearchTexts, version };
 }
 
 export const useSearchStore = create<SearchState>((set) => ({

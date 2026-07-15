@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { useEffect } from 'react';
 
 export type ToastType = 'error' | 'success' | 'info' | 'warning';
 

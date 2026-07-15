@@ -240,7 +240,8 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
       }
 
       if (typeof window !== 'undefined') {
-        const AC = window.AudioContext || (window as any).webkitAudioContext;
+        const AC = window.AudioContext ||
+          (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
         if (AC) {
           if (!audioContextRef.current) {
             audioContextRef.current = new AC();
@@ -364,7 +365,7 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
       };
 
       recorder.onerror = (e: Event) => {
-        const err = (e as any).error;
+        const err = (e as Event & { error?: DOMException }).error;
         setError('Recording error: ' + (err?.message || 'unknown'));
         setIsListening(false);
         setIsPreparing(false);

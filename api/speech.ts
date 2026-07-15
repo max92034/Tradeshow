@@ -9,7 +9,6 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { Readable } from 'stream';
 
 const ALLOWED_ORIGINS = [
   /^https:\/\/.*\.vercel\.app$/,
@@ -246,7 +245,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const result = await response.json();
-      let transcript = result?.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
+      const transcript = result?.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
       const confidence = result?.results?.channels?.[0]?.alternatives?.[0]?.confidence || 0;
 
       const cleanedTranscript = transcript

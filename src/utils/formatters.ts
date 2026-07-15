@@ -1,4 +1,4 @@
-import { Product, Order, OrderItem } from '../types';
+import { Product, OrderItem } from '../types';
 
 export function formatDimensions(product: Product): string {
   if (!product.length && !product.width && !product.height) return '';

@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import { Product } from '../types';
 import { sanitizeValue, sanitizeNumber } from './formatters';
 
@@ -49,13 +48,16 @@ const COLUMN_MAP: Record<string, keyof Product> = {
   'keywords': 'keyword',
 };
 
-export function parseExcelFile(file: File): Promise<Product[]> {
+export async function parseExcelFile(file: File): Promise<Product[]> {
+  // xlsx is ~400KB minified — load it only when a file is actually parsed
+  // so it stays out of the initial bundle.
+  const XLSX = await import('xlsx');
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
+        const workbook = XLSX.read(data, { type: 'array' });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as unknown[][];
         
@@ -126,7 +128,7 @@ export function parseExcelFile(file: File): Promise<Product[]> {
       }
     };
     reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   });
 }
 

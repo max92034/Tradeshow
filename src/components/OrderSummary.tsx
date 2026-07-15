@@ -3,7 +3,6 @@ import { useOrderStore } from '../store/useOrderStore';
 import { useToast } from './Toast';
 import { formatPrice } from '../utils/formatters';
 import { cn } from '../lib/utils';
-import * as XLSX from 'xlsx';
 import { getCountryByCode } from '../data/countries';
 
 function validateBuyer(buyer: ReturnType<typeof useOrderStore.getState>['currentOrder']['buyer']): string[] {
@@ -36,8 +35,10 @@ export function OrderSummary() {
     return true;
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!canProceed()) return;
+    // Loaded on demand — keeps the ~400KB xlsx library out of the initial bundle
+    const XLSX = await import('xlsx');
     
     const country = getCountryByCode(order.buyer?.nationality || '');
     

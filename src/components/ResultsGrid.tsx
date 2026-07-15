@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { Product } from '../types';
 import { ProductCard } from './ProductCard';
 import { Package, Grid2X2, List, Plus } from 'lucide-react';
@@ -116,23 +116,56 @@ const ListItem = React.memo(function ListItem({ product }: ListItemProps) {
   );
 });
 
+// How many items to mount per "page" — a full catalog can be thousands of
+// products, and mounting them all at once makes the first paint very slow.
+const PAGE_SIZE = 48;
+
 export const ResultsGrid = React.memo(function ResultsGrid({ products, isLoading, onUploadClick }: ResultsGridProps) {
   const viewMode = useSettingsStore(state => state.viewMode);
   const setViewMode = useSettingsStore(state => state.setViewMode);
 
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [products]);
+
+  const hasMore = visibleCount < products.length;
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount(c => Math.min(c + PAGE_SIZE, products.length));
+        }
+      },
+      { rootMargin: '800px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, products.length, viewMode, isLoading]);
+
+  const visibleProducts = useMemo(
+    () => (products.length > visibleCount ? products.slice(0, visibleCount) : products),
+    [products, visibleCount]
+  );
+
   const productCards = useMemo(() => {
-    return products.map((product) => (
+    return visibleProducts.map((product) => (
       <div key={product.sku} className="h-full">
         <ProductCard product={product} />
       </div>
     ));
-  }, [products]);
+  }, [visibleProducts]);
 
   const listItems = useMemo(() => {
-    return products.map((product) => (
+    return visibleProducts.map((product) => (
       <ListItem key={product.sku} product={product} />
     ));
-  }, [products]);
+  }, [visibleProducts]);
 
   const viewToggle = (
     <div className="flex items-center gap-0.5 p-1 rounded-lg bg-[var(--bg-secondary)]">
@@ -243,6 +276,7 @@ export const ResultsGrid = React.memo(function ResultsGrid({ products, isLoading
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {productCards}
         </div>
+        {hasMore && <div ref={sentinelRef} className="h-px" aria-hidden="true" />}
       </div>
     );
   }
@@ -251,6 +285,7 @@ export const ResultsGrid = React.memo(function ResultsGrid({ products, isLoading
     <div className="pt-4">
       <div className="flex justify-end mb-4">{viewToggle}</div>
       <div className="flex flex-col">{listItems}</div>
+      {hasMore && <div ref={sentinelRef} className="h-px" aria-hidden="true" />}
     </div>
   );
 });
