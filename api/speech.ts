@@ -50,24 +50,36 @@ async function parseFormData(req: VercelRequest): Promise<{ audio: Buffer; langu
         let language = '';
         let mimeType = '';
         
-        // Split by boundary while preserving binary data
+        // Split by boundary while preserving binary data.
+        // A boundary only counts when it sits at the start of a line
+        // (start of body or preceded by CRLF) — binary audio can legally
+        // contain any byte sequence, so we must never filter parts by
+        // their content.
         const splitBody = (body: Buffer, boundary: Buffer): Buffer[] => {
-          const parts: Buffer[] = [];
-          let start = 0;
-          let idx = body.indexOf(boundary, start);
+          const positions: number[] = [];
+          let idx = body.indexOf(boundary);
           while (idx !== -1) {
-            if (idx > start) {
-              parts.push(body.slice(start, idx));
+            if (idx === 0 || (body[idx - 2] === 0x0D && body[idx - 1] === 0x0A)) {
+              positions.push(idx);
             }
-            start = idx + boundary.length;
-            idx = body.indexOf(boundary, start);
+            idx = body.indexOf(boundary, idx + boundary.length);
           }
-          if (start < body.length) {
-            parts.push(body.slice(start));
+
+          const parts: Buffer[] = [];
+          for (let i = 0; i < positions.length - 1; i++) {
+            // Skip past the boundary line's trailing CRLF
+            const lineEnd = body.indexOf(Buffer.from('\r\n'), positions[i] + boundary.length);
+            if (lineEnd === -1) continue;
+            const partStart = lineEnd + 2;
+            // Strip the CRLF that precedes the next boundary
+            const partEnd = positions[i + 1] - 2;
+            if (partEnd > partStart) {
+              parts.push(body.slice(partStart, partEnd));
+            }
           }
-          return parts.filter(p => p.length > 2 && !p.includes(Buffer.from('--')));
+          return parts;
         };
-        
+
         const parts = splitBody(body, boundaryBuffer);
         
         for (const part of parts) {

@@ -23,6 +23,8 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
   const stopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isIOSRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const stopRequestedRef = useRef(false);
+  const keepAliveNodesRef = useRef<AudioNode[]>([]);
 
   useEffect(() => {
     onResultRef.current = onResult;
@@ -160,15 +162,52 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
     }
   }, [lang]);
 
+  const scheduleStop = useCallback(() => {
+    if (stopTimeoutRef.current) {
+      clearTimeout(stopTimeoutRef.current);
+    }
+
+    const isIOS = isIOSRef.current;
+    const delay = isIOS ? 400 : 200;
+
+    stopTimeoutRef.current = setTimeout(() => {
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== 'inactive') {
+        try {
+          recorder.stop();
+        } catch {
+          // ignore
+        }
+      }
+
+      if (isIOS) {
+        setTimeout(() => {
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach(t => t.stop());
+            streamRef.current = null;
+          }
+          mediaRecorderRef.current = null;
+        }, 400);
+      }
+    }, delay);
+  }, []);
+
   const startListening = useCallback(async () => {
     setError(null);
     setTranscript('');
     setIsProcessing(false);
     audioChunksRef.current = [];
 
+    stopRequestedRef.current = false;
+
     // --- CHANGED: Force-stop existing recorder immediately ---
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       try {
+        // Detach handlers first so the orphaned recorder can't fire onstop
+        // and send stale audio / clobber the new recording's state.
+        mediaRecorderRef.current.ondataavailable = null;
+        mediaRecorderRef.current.onstop = null;
+        mediaRecorderRef.current.onerror = null;
         mediaRecorderRef.current.stop();
       } catch { /* already stopping */ }
       mediaRecorderRef.current = null;
@@ -233,11 +272,18 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
       // --- NEW: Keep iOS audio session alive ---
       if (isIOS && audioContextRef.current) {
         try {
+          // Tear down nodes from the previous recording so they don't pile up
+          for (const node of keepAliveNodesRef.current) {
+            try { node.disconnect(); } catch { /* already disconnected */ }
+          }
+          keepAliveNodesRef.current = [];
+
           const source = audioContextRef.current.createMediaStreamSource(stream);
           const gain = audioContextRef.current.createGain();
           gain.gain.value = 0; // silent
           source.connect(gain);
           gain.connect(audioContextRef.current.destination);
+          keepAliveNodesRef.current = [source, gain];
         } catch {
           // non-critical — recording still works without this
         }
@@ -329,6 +375,14 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
 
       setIsPreparing(false);
       setIsListening(true);
+
+      // If the user released the button while getUserMedia was still pending
+      // (common on iOS: the mic permission prompt and audio-session setup are
+      // slow), stopListening ran before any recorder existed and was a no-op.
+      // Without this check the recorder would keep recording forever.
+      if (stopRequestedRef.current) {
+        scheduleStop();
+      }
     } catch (e) {
       setIsPreparing(false);
       const err = e as Error | DOMException;
@@ -344,37 +398,12 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
         streamRef.current = null;
       }
     }
-  }, [sendAudioForTranscription]);
+  }, [sendAudioForTranscription, scheduleStop]);
 
   const stopListening = useCallback(() => {
-    if (stopTimeoutRef.current) {
-      clearTimeout(stopTimeoutRef.current);
-    }
-
-    const isIOS = isIOSRef.current;
-    const delay = isIOS ? 400 : 200;
-
-    stopTimeoutRef.current = setTimeout(() => {
-      const recorder = mediaRecorderRef.current;
-      if (recorder && recorder.state !== 'inactive') {
-        try {
-          recorder.stop();
-        } catch {
-          // ignore
-        }
-      }
-
-      if (isIOS) {
-        setTimeout(() => {
-          if (streamRef.current) {
-            streamRef.current.getTracks().forEach(t => t.stop());
-            streamRef.current = null;
-          }
-          mediaRecorderRef.current = null;
-        }, 400);
-      }
-    }, delay);
-  }, []);
+    stopRequestedRef.current = true;
+    scheduleStop();
+  }, [scheduleStop]);
 
   return {
     isListening,
