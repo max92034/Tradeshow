@@ -53,11 +53,25 @@ function migrateOrderItem(item: Partial<OrderItem>): OrderItem {
   };
 }
 
-function migrateOrders(orders: Order[]): Order[] {
-  return orders.map(order => ({
-    ...order,
-    items: order.items.map(item => migrateOrderItem(item)),
-  }));
+function migrateOrders(orders: unknown): Order[] {
+  if (!Array.isArray(orders)) return [];
+  return orders
+    .filter((order): order is Order => order != null && typeof order === 'object')
+    .map(order => {
+      const items = Array.isArray(order.items) ? order.items : [];
+      return {
+        id: order.id || generateId(),
+        items: items.map(item => migrateOrderItem(item)),
+        subtotal: typeof order.subtotal === 'number' ? order.subtotal : 0,
+        totalItems: typeof order.totalItems === 'number' ? order.totalItems : 0,
+        totalCartons: typeof order.totalCartons === 'number' ? order.totalCartons : 0,
+        buyer: order.buyer || null,
+        status: (order.status as Order['status']) || 'saved',
+        notes: order.notes || '',
+        createdAt: order.createdAt || new Date().toISOString(),
+        updatedAt: order.updatedAt || new Date().toISOString(),
+      };
+    });
 }
 
 const rawSavedOrders = loadFromStorage<Order[]>(storageKeys.ORDERS);
@@ -162,30 +176,47 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     }
     
     saveToStorage(storageKeys.ORDERS, saved);
-    
-    // Reset current order to empty after saving
-    const newEmpty = createEmptyOrder();
-    set({ savedOrders: saved, currentOrder: newEmpty });
+    set({ savedOrders: saved, currentOrder: orderToSave });
   },
   
   loadOrder: (id: string) => {
     const order = get().savedOrders.find(o => o.id === id);
     if (order) {
+      const items = Array.isArray(order.items) ? order.items : [];
       const migrated = {
         ...order,
-        items: order.items.map(item => migrateOrderItem(item)),
+        items: items.map(item => migrateOrderItem(item)),
+        subtotal: typeof order.subtotal === 'number' ? order.subtotal : 0,
+        totalItems: typeof order.totalItems === 'number' ? order.totalItems : 0,
+        totalCartons: typeof order.totalCartons === 'number' ? order.totalCartons : 0,
+        buyer: order.buyer || null,
+        status: order.status || 'saved',
+        notes: order.notes || '',
+        createdAt: order.createdAt || new Date().toISOString(),
+        updatedAt: order.updatedAt || new Date().toISOString(),
       };
       set({ currentOrder: migrated, isDrawerOpen: true });
     }
   },
   
   deleteOrder: (id: string) => {
-    const saved = get().savedOrders.filter(o => o.id !== id);
-    saveToStorage(storageKeys.ORDERS, saved);
-    set({ savedOrders: saved });
-    
-    if (get().currentOrder.id === id) {
-      set({ currentOrder: createEmptyOrder() });
+    try {
+      const currentSaved = get().savedOrders;
+      if (!Array.isArray(currentSaved)) {
+        set({ savedOrders: [], currentOrder: createEmptyOrder() });
+        return;
+      }
+      const saved = currentSaved.filter(o => o && o.id !== id);
+      saveToStorage(storageKeys.ORDERS, saved);
+      set({ savedOrders: saved });
+
+      if (get().currentOrder?.id === id) {
+        set({ currentOrder: createEmptyOrder() });
+      }
+    } catch (e) {
+      console.error('Failed to delete order:', e);
+      saveToStorage(storageKeys.ORDERS, []);
+      set({ savedOrders: [], currentOrder: createEmptyOrder() });
     }
   },
   

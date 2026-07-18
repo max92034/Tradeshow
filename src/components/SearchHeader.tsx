@@ -376,6 +376,26 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
             </button>
 
             <button
+              onClick={onHistoryClick}
+              className="hidden sm:inline-flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 active:scale-95"
+              style={{
+                color: 'var(--text-secondary)',
+                backgroundColor: 'var(--bg-secondary)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--bg-elevated)';
+                e.currentTarget.style.color = 'var(--text-primary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
+                e.currentTarget.style.color = 'var(--text-secondary)';
+              }}
+              aria-label="Open order history"
+            >
+              <History size={20} strokeWidth={1.5} />
+            </button>
+
+            <button
               onClick={() => toggleDrawer(true)}
               className="relative inline-flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 active:scale-95 shadow-md"
               style={{

@@ -3,6 +3,7 @@ import { useOrderStore } from '../store/useOrderStore';
 import { CartItem } from './CartItem';
 import { BuyerInfoForm } from './BuyerInfoForm';
 import { OrderSummary } from './OrderSummary';
+import { useToast } from './Toast';
 import { cn } from '../lib/utils';
 
 interface OrderDrawerProps {
@@ -14,9 +15,11 @@ export function OrderDrawer({ isOpen, onClose }: OrderDrawerProps) {
   const order = useOrderStore(state => state.currentOrder);
   const newOrder = useOrderStore(state => state.newOrder);
   const saveOrder = useOrderStore(state => state.saveOrder);
+  const { addToast } = useToast();
 
   const handleSave = () => {
     saveOrder();
+    addToast('Quotation saved!', 'success');
   };
 
   return (
