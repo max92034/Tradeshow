@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 export type VoiceLanguage = 'zh-CN' | 'en';
-export type ThemeMode = 'light' | 'dark' | 'gold';
+export type ThemeMode = 'light' | 'dark' | 'gold' | 'lakers';
 
 interface SettingsState {
   voiceLanguage: VoiceLanguage;
@@ -30,7 +30,7 @@ export const useSettingsStore = create<SettingsState>()(
       setTheme: (theme: ThemeMode) => set({ theme }),
       toggleTheme: () => {
         const current = get().theme;
-        const modes: ThemeMode[] = ['light', 'dark', 'gold'];
+        const modes: ThemeMode[] = ['light', 'dark', 'gold', 'lakers'];
         const nextIndex = (modes.indexOf(current) + 1) % modes.length;
         set({ theme: modes[nextIndex] });
       },

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
-import { Search, ShoppingCart, History, X, Settings, Menu, Sun, Moon, Sparkles, Mic, Upload } from 'lucide-react';
+import { Search, ShoppingCart, History, X, Settings, Menu, Sun, Moon, Sparkles, Mic, Upload, Trophy } from 'lucide-react';
 import { VoiceIcon } from './VoiceIcon';
 import { useSearchStore } from '../store/useSearchStore';
 import { useOrderStore } from '../store/useOrderStore';
@@ -18,12 +18,14 @@ const themeIconMap: Record<ThemeMode, React.ReactNode> = {
   light: <Sun size={18} strokeWidth={1.5} />,
   dark: <Moon size={18} strokeWidth={1.5} />,
   gold: <Sparkles size={18} strokeWidth={1.5} />,
+  lakers: <Trophy size={18} strokeWidth={1.5} />,
 };
 
 const themeLabelMap: Record<ThemeMode, string> = {
   light: 'Light',
   dark: 'Dark',
   gold: 'Gold',
+  lakers: 'Lakers',
 };
 
 export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, onHistoryClick, onSettingsClick }: SearchHeaderProps) {
@@ -106,11 +108,13 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
     >
       <div className="h-16 sm:h-[72px] px-4 sm:px-8">
         <div className="h-full flex items-center gap-3 sm:gap-4">
-          <h1 className="hidden sm:block text-xl font-bold tracking-tight whitespace-nowrap">
-            <span style={{ color: 'var(--text-primary)' }}>Trade</span>
-            <span style={{ color: 'var(--accent)' }}>Show</span>
-          </h1>
-
+          <a href="#" className="flex items-center gap-2 whitespace-nowrap">
+            <img
+              src="/Tradeshow/assets/logo-desmo.png"
+              alt="DESMO Logo"
+              className="h-14 object-contain"
+            />
+          </a>
           <div className="flex-1 relative">
             <div className="relative flex items-center h-10">
               <Search

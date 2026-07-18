@@ -12,6 +12,7 @@ const themeOptions: { id: ThemeMode; name: string; description: string; swatch: 
   { id: 'light', name: 'Light', description: 'Clean & bright', swatch: '#f7f5f2' },
   { id: 'dark', name: 'Dark', description: 'Modern & sleek', swatch: '#000000', accent: '#0a84ff' },
   { id: 'gold', name: 'Gold', description: 'Premium & bold', swatch: '#0f0f0f', accent: '#c9a96e' },
+  { id: 'lakers', name: 'Lakers', description: 'Purple & gold', swatch: '#552583', accent: '#ffce32' },
 ];
 
 const APP_VERSION = '1.0.0';
@@ -92,7 +93,7 @@ export const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose
                   Choose your preferred visual style
                 </p>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {themeOptions.map((option) => (
                   <button
                     key={option.id}
