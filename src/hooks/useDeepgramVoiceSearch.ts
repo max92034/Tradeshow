@@ -24,7 +24,6 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
   const isIOSRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const stopRequestedRef = useRef(false);
-  const keepAliveNodesRef = useRef<AudioNode[]>([]);
 
   useEffect(() => {
     onResultRef.current = onResult;
@@ -239,7 +238,28 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
         streamRef.current = null;
       }
 
-      if (typeof window !== 'undefined') {
+      // NOTE: getUserMedia must run as early as possible in the user-gesture
+      // call stack. On iOS Safari, awaiting anything (e.g. AudioContext.resume)
+      // before this call can make the permission prompt never appear.
+      // Also: do NOT route this stream through WebAudio on iOS — a known bug
+      // makes MediaRecorder capture silence when the same stream is consumed
+      // by an AudioContext, which is exactly the "no speech recognized"
+      // failure seen on iPhone.
+      const constraints: MediaStreamConstraints = {
+        audio: isIOS
+          ? true
+          : {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: true,
+              channelCount: 1,
+            },
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      streamRef.current = stream;
+
+      if (!isIOS && typeof window !== 'undefined') {
         const AC = window.AudioContext ||
           (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
         if (AC) {
@@ -255,41 +275,6 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
           }
         }
       }
-
-      const constraints: MediaStreamConstraints = {
-        audio: isIOS
-          ? true
-          : {
-              echoCancellation: false,
-              noiseSuppression: false,
-              autoGainControl: true,
-              channelCount: 1,
-            },
-      };
-
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = stream;
-
-      // --- NEW: Keep iOS audio session alive ---
-      if (isIOS && audioContextRef.current) {
-        try {
-          // Tear down nodes from the previous recording so they don't pile up
-          for (const node of keepAliveNodesRef.current) {
-            try { node.disconnect(); } catch { /* already disconnected */ }
-          }
-          keepAliveNodesRef.current = [];
-
-          const source = audioContextRef.current.createMediaStreamSource(stream);
-          const gain = audioContextRef.current.createGain();
-          gain.gain.value = 0; // silent
-          source.connect(gain);
-          gain.connect(audioContextRef.current.destination);
-          keepAliveNodesRef.current = [source, gain];
-        } catch {
-          // non-critical — recording still works without this
-        }
-      }
-      // --- END NEW ---
 
       const audioTracks = stream.getAudioTracks();
       if (audioTracks.length === 0) {

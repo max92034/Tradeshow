@@ -171,12 +171,14 @@ export function VoiceSearchButton() {
       <button
         type="button"
         onPointerDown={onPointerDown}
+        onContextMenu={(e) => e.preventDefault()}
         className={cn(
           "w-16 h-16 rounded-full flex items-center justify-center shadow-lg touch-none relative transition-all duration-200 select-none",
           bgClass,
           state === 'preparing' && 'animate-pulse',
           state === 'error' && 'animate-shake'
         )}
+        style={{ WebkitTouchCallout: 'none' }}
         aria-label="Hold to voice search"
       >
         {state === 'listening' && (
