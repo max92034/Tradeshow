@@ -1,7 +1,10 @@
 import React from 'react';
-import { X, Settings as SettingsIcon } from 'lucide-react';
+import { X, Settings as SettingsIcon, Download, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useSettingsStore, type ThemeMode } from '../store/useSettingsStore';
+import { useProductStore } from '../store/useProductStore';
+import { useSearchStore } from '../store/useSearchStore';
+import { downloadBlankTemplate } from '../utils/excelParser';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -23,6 +26,16 @@ export const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose
   const setTheme = useSettingsStore(state => state.setTheme);
   const voiceLanguage = useSettingsStore(state => state.voiceLanguage);
   const toggleVoiceLanguage = useSettingsStore(state => state.toggleVoiceLanguage);
+  const productCount = useProductStore(state => state.products.length);
+  const clearProducts = useProductStore(state => state.clearProducts);
+  const performSearch = useSearchStore(state => state.performSearch);
+
+  const handlePurge = () => {
+    if (window.confirm('Remove all loaded catalog data from this device? Saved orders are kept.')) {
+      clearProducts();
+      performSearch('');
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -170,6 +183,53 @@ export const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose
                       left: voiceLanguage === 'en' ? '22px' : '2px',
                     }}
                   />
+                </button>
+              </div>
+            </div>
+
+            <div className="border-t border-[var(--border-soft)] pt-5">
+              <h3
+                className="font-semibold mb-1"
+                style={{ fontSize: 'var(--text-h3)', color: 'var(--text-primary)' }}
+              >
+                Catalog
+              </h3>
+              <p
+                className="mb-3"
+                style={{ fontSize: 'var(--text-small)', color: 'var(--text-muted)' }}
+              >
+                {productCount > 0 ? `${productCount} products loaded` : 'No catalog loaded'}
+              </p>
+              <div className="space-y-2">
+                <button
+                  onClick={() => { void downloadBlankTemplate(); }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors"
+                  style={{
+                    fontSize: 'var(--text-body)',
+                    background: 'var(--bg-secondary)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border-soft)',
+                  }}
+                >
+                  <Download size={18} />
+                  Download Blank Template
+                </button>
+                <button
+                  onClick={handlePurge}
+                  disabled={productCount === 0}
+                  className={cn(
+                    "w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors",
+                    productCount === 0 && "opacity-50 cursor-not-allowed"
+                  )}
+                  style={{
+                    fontSize: 'var(--text-body)',
+                    background: 'var(--danger-soft, rgba(239, 68, 68, 0.1))',
+                    color: 'var(--danger)',
+                    border: '1px solid var(--danger)',
+                  }}
+                >
+                  <Trash2 size={18} />
+                  Purge Catalog Data
                 </button>
               </div>
             </div>
