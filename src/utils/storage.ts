@@ -19,14 +19,6 @@ export function loadFromStorage<T>(key: string): T | null {
   }
 }
 
-export function removeFromStorage(key: string): void {
-  try {
-    localStorage.removeItem(key);
-  } catch (e) {
-    console.error('Failed to remove from localStorage:', e);
-  }
-}
-
 export const storageKeys = {
   ORDERS: ORDERS_KEY,
   PRODUCTS: PRODUCTS_KEY,

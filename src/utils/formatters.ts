@@ -1,17 +1,4 @@
-import { Product, OrderItem } from '../types';
-
-export function formatDimensions(product: Product): string {
-  if (!product.length && !product.width && !product.height) return '';
-  const l = product.length || 0;
-  const w = product.width || 0;
-  const h = product.height || 0;
-  return `${l} * ${w} * ${h} CM`;
-}
-
-export function formatCartonQty(product: Product): string {
-  if (!product.cartonQty) return '';
-  return `${product.cartonQty}pcs/Carton`;
-}
+import { OrderItem } from '../types';
 
 export function formatPrice(price: number): string {
   if (price == null || isNaN(price)) return '';

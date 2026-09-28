@@ -136,3 +136,19 @@ export function isExcelFile(file: File): boolean {
   const name = file.name.toLowerCase();
   return name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv');
 }
+
+const TEMPLATE_HEADERS = [
+  'SKU', 'Description', 'Collection', 'Location',
+  'L', 'W', 'H', 'Weight',
+  'Unit', 'Carton Qty', 'Inner Qty', 'Carton L', 'Carton W', 'Carton H',
+  'Category', 'Subcategory',
+  'FOB', 'Note', 'IMG', 'Keyword',
+];
+
+export async function downloadBlankTemplate(): Promise<void> {
+  const XLSX = await import('xlsx');
+  const sheet = XLSX.utils.aoa_to_sheet([TEMPLATE_HEADERS]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Catalog');
+  XLSX.writeFile(workbook, 'catalog-template.xlsx');
+}

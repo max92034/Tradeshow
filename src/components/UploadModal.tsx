@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
-import { X, Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react';
-import { parseExcelFile, isExcelFile } from '../utils/excelParser';
+import { X, Upload, FileText, CheckCircle, AlertCircle, Download } from 'lucide-react';
+import { parseExcelFile, isExcelFile, downloadBlankTemplate } from '../utils/excelParser';
 import { useProductStore } from '../store/useProductStore';
 import { useSearchStore } from '../store/useSearchStore';
 import { cn } from '../lib/utils';
@@ -260,12 +260,22 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
           )}
 
           <div className="mt-4 p-4 rounded-lg bg-[var(--bg-secondary)]">
-            <p
-              className="font-medium mb-2"
-              style={{ fontSize: 'var(--text-small)', color: 'var(--text-primary)' }}
-            >
-              Required columns:
-            </p>
+            <div className="flex items-center justify-between mb-2">
+              <p
+                className="font-medium"
+                style={{ fontSize: 'var(--text-small)', color: 'var(--text-primary)' }}
+              >
+                Required columns:
+              </p>
+              <button
+                onClick={() => { void downloadBlankTemplate(); }}
+                className="flex items-center gap-1 font-medium hover:underline"
+                style={{ fontSize: 'var(--text-small)', color: 'var(--accent)' }}
+              >
+                <Download size={14} />
+                Download blank template
+              </button>
+            </div>
             <div className="flex flex-wrap gap-1.5">
               {['SKU', 'Description', 'Location', 'L', 'W', 'H', 'FOB', 'Carton Qty', 'IMG', 'Keyword'].map(col => (
                 <span
