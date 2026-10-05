@@ -1,6 +1,6 @@
 import { Trash2, Package } from 'lucide-react';
 import { OrderItem } from '../types';
-import { formatPrice, normalizeImageUrl } from '../utils/formatters';
+import { formatPrice, productImageUrl } from '../utils/formatters';
 import { useOrderStore } from '../store/useOrderStore';
 import { cn } from '../lib/utils';
 
@@ -21,9 +21,9 @@ export function CartItem({ item, isLast = false }: CartItemProps) {
         className="w-16 h-16 flex-shrink-0 overflow-hidden rounded-lg"
         style={{ background: 'var(--bg-secondary)' }}
       >
-        {item.imageUrl ? (
+        {productImageUrl(item.sku, item.imageUrl) ? (
           <img
-            src={normalizeImageUrl(item.imageUrl)}
+            src={productImageUrl(item.sku, item.imageUrl)}
             alt={item.description}
             className="w-full h-full object-cover"
             onError={(e) => {

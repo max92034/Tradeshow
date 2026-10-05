@@ -49,3 +49,13 @@ export function normalizeImageUrl(url: string): string {
   const inner = new URLSearchParams(url.slice(idx + marker.length)).get('url');
   return inner || url;
 }
+
+const CLOUDFRONT_PHOTO_BASE = 'https://d2smnk90fd10gg.cloudfront.net/commodity/photo';
+
+// Product photos follow the convention `<SKU>-1.jpg` on CloudFront, so the
+// IMG column is optional — fall back to the SKU-derived URL when it's empty.
+export function productImageUrl(sku: string, imageUrl: string): string {
+  const direct = normalizeImageUrl(imageUrl);
+  if (direct) return direct;
+  return sku ? `${CLOUDFRONT_PHOTO_BASE}/${encodeURIComponent(sku)}-1.jpg` : '';
+}

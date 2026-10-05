@@ -3,7 +3,7 @@ import { Product } from '../types';
 import { ProductCard } from './ProductCard';
 import { Package, Grid2X2, List, Plus } from 'lucide-react';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { formatPrice, normalizeImageUrl } from '../utils/formatters';
+import { formatPrice, productImageUrl } from '../utils/formatters';
 import { useOrderStore } from '../store/useOrderStore';
 import { cn } from '../lib/utils';
 
@@ -35,6 +35,8 @@ const ListItem = React.memo(function ListItem({ product }: ListItemProps) {
     ? `${product.length || 0}×${product.width || 0}×${product.height || 0} cm`
     : null;
 
+  const imgSrc = productImageUrl(product.sku, product.imageUrl);
+
   const inlineParts: string[] = [];
   if (dims) inlineParts.push(dims);
   if (hasWeight) inlineParts.push(`${product.weight} kg`);
@@ -49,9 +51,9 @@ const ListItem = React.memo(function ListItem({ product }: ListItemProps) {
         className="w-24 h-24 rounded-lg flex-shrink-0 overflow-hidden"
         style={{ aspectRatio: '1/1' }}
       >
-        {product.imageUrl && !imgError ? (
+        {imgSrc && !imgError ? (
           <img
-            src={normalizeImageUrl(product.imageUrl)}
+            src={imgSrc}
             alt={product.description}
             className="w-full h-full object-cover"
             loading="lazy"

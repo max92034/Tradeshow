@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { Package, Check } from 'lucide-react';
 import { Product } from '../types';
-import { formatPrice, normalizeImageUrl } from '../utils/formatters';
+import { formatPrice, productImageUrl } from '../utils/formatters';
 import { useOrderStore } from '../store/useOrderStore';
 import { cn } from '../lib/utils';
 
@@ -70,6 +70,8 @@ export const ProductCard = React.memo(function ProductCard({ product }: ProductC
     ? `${product.length || 0}×${product.width || 0}×${product.height || 0} cm`
     : '';
 
+  const imgSrc = productImageUrl(product.sku, product.imageUrl);
+
   const hasAnyInfo = hasDims || hasWeight || hasCartonQty || hasPrice;
 
   return (
@@ -88,9 +90,9 @@ export const ProductCard = React.memo(function ProductCard({ product }: ProductC
           borderTopRightRadius: 'var(--radius-lg)',
         }}
       >
-        {product.imageUrl && !imgError ? (
+        {imgSrc && !imgError ? (
           <img
-            src={normalizeImageUrl(product.imageUrl)}
+            src={imgSrc}
             alt={product.description}
             style={{
               width: '100%',
