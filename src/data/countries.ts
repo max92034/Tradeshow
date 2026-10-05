@@ -4,10 +4,6 @@ export interface Country {
   flag: string;
 }
 
-export function getFlagUrl(code: string, size: number = 40): string {
-  return `https://flagcdn.com/w${size}/${code.toLowerCase()}.png`;
-}
-
 export const countries: Country[] = [
   { code: 'AF', name: 'Afghanistan', flag: '🇦🇫' },
   { code: 'AL', name: 'Albania', flag: '🇦🇱' },

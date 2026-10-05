@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { Product } from '../types';
 import { loadFromStorage, saveToStorage, storageKeys } from '../utils/storage';
-import { sampleProducts } from '../data/sampleProducts';
 
 interface ProductState {
   products: Product[];
@@ -9,8 +8,7 @@ interface ProductState {
   version: number;
   loadProducts: (products: Product[]) => void;
   clearProducts: () => void;
-  getProductBySku: (sku: string) => Product | undefined;
-  loadSampleData: () => void;
+  loadSampleData: () => Promise<void>;
 }
 
 function migrateProduct(p: Partial<Product>): Product {
@@ -60,11 +58,8 @@ export const useProductStore = create<ProductState>((set, get) => ({
     saveToStorage(storageKeys.PRODUCTS, []);
   },
   
-  getProductBySku: (sku: string) => {
-    return get().products.find(p => p.sku.toLowerCase() === sku.toLowerCase());
-  },
-  
-  loadSampleData: () => {
+  loadSampleData: async () => {
+    const { sampleProducts } = await import('../data/sampleProducts');
     const newVersion = get().version + 1;
     set({ products: sampleProducts, isLoaded: true, version: newVersion });
     saveToStorage(storageKeys.PRODUCTS, sampleProducts);

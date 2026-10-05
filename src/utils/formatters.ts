@@ -38,3 +38,14 @@ export function sanitizeNumber(value: unknown): number {
 export function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
 }
+
+// Next.js image-proxy URLs (`/_next/image?url=<real>`) return 400 without the
+// required `w` param, so unwrap and use the origin URL directly.
+export function normalizeImageUrl(url: string): string {
+  if (!url) return url;
+  const marker = '/_next/image?';
+  const idx = url.indexOf(marker);
+  if (idx === -1) return url;
+  const inner = new URLSearchParams(url.slice(idx + marker.length)).get('url');
+  return inner || url;
+}

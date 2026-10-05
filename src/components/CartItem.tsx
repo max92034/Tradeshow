@@ -1,6 +1,6 @@
 import { Trash2, Package } from 'lucide-react';
 import { OrderItem } from '../types';
-import { formatPrice } from '../utils/formatters';
+import { formatPrice, normalizeImageUrl } from '../utils/formatters';
 import { useOrderStore } from '../store/useOrderStore';
 import { cn } from '../lib/utils';
 
@@ -23,7 +23,7 @@ export function CartItem({ item, isLast = false }: CartItemProps) {
       >
         {item.imageUrl ? (
           <img
-            src={item.imageUrl}
+            src={normalizeImageUrl(item.imageUrl)}
             alt={item.description}
             className="w-full h-full object-cover"
             onError={(e) => {

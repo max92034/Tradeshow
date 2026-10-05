@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { Package, Check } from 'lucide-react';
 import { Product } from '../types';
-import { formatPrice } from '../utils/formatters';
+import { formatPrice, normalizeImageUrl } from '../utils/formatters';
 import { useOrderStore } from '../store/useOrderStore';
 import { cn } from '../lib/utils';
 
@@ -90,7 +90,7 @@ export const ProductCard = React.memo(function ProductCard({ product }: ProductC
       >
         {product.imageUrl && !imgError ? (
           <img
-            src={product.imageUrl}
+            src={normalizeImageUrl(product.imageUrl)}
             alt={product.description}
             style={{
               width: '100%',

@@ -1,5 +1,5 @@
 import { Product } from '../types';
-import { sanitizeValue, sanitizeNumber } from './formatters';
+import { sanitizeValue, sanitizeNumber, normalizeImageUrl } from './formatters';
 
 const COLUMN_MAP: Record<string, keyof Product> = {
   // Product Identification
@@ -117,6 +117,7 @@ export async function parseExcelFile(file: File): Promise<Product[]> {
             }
           }
 
+          product.imageUrl = normalizeImageUrl(product.imageUrl);
           if (product.sku) {
             products.push(product);
           }

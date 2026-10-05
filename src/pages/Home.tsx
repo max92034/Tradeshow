@@ -30,8 +30,8 @@ export default function Home() {
     }
   }, [isLoaded, products.length, performSearch]);
 
-  const handleLoadSample = () => {
-    loadSampleData();
+  const handleLoadSample = async () => {
+    await loadSampleData();
     performSearch('');
   };
 

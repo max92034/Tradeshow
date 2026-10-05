@@ -199,7 +199,7 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
 
     stopRequestedRef.current = false;
 
-    // --- CHANGED: Force-stop existing recorder immediately ---
+    // Force-stop any existing recorder before starting a new one.
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       try {
         // Detach handlers first so the orphaned recorder can't fire onstop
@@ -216,7 +216,6 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
-    // --- END CHANGED ---
 
     if (stopTimeoutRef.current) {
       clearTimeout(stopTimeoutRef.current);
@@ -294,7 +293,7 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
         recorderOptions.audioBitsPerSecond = 128000;
       }
 
-      // --- CHANGED: Try preferred MIME, fallback to default ---
+      // Try the preferred MIME type; fall back to the browser default.
       let recorder: MediaRecorder;
       try {
         recorder = new MediaRecorder(stream, recorderOptions);
@@ -304,7 +303,6 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
       }
       // Capture actual MIME type from the created recorder
       mimeTypeRef.current = recorder.mimeType || mimeTypeRef.current || 'audio/webm';
-      // --- END CHANGED ---
 
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];

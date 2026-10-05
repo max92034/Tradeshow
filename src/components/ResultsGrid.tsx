@@ -3,13 +3,12 @@ import { Product } from '../types';
 import { ProductCard } from './ProductCard';
 import { Package, Grid2X2, List, Plus } from 'lucide-react';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { formatPrice } from '../utils/formatters';
+import { formatPrice, normalizeImageUrl } from '../utils/formatters';
 import { useOrderStore } from '../store/useOrderStore';
 import { cn } from '../lib/utils';
 
 interface ResultsGridProps {
   products: Product[];
-  isLoading?: boolean;
   onUploadClick?: () => void;
 }
 
@@ -52,7 +51,7 @@ const ListItem = React.memo(function ListItem({ product }: ListItemProps) {
       >
         {product.imageUrl && !imgError ? (
           <img
-            src={product.imageUrl}
+            src={normalizeImageUrl(product.imageUrl)}
             alt={product.description}
             className="w-full h-full object-cover"
             loading="lazy"
@@ -120,7 +119,7 @@ const ListItem = React.memo(function ListItem({ product }: ListItemProps) {
 // products, and mounting them all at once makes the first paint very slow.
 const PAGE_SIZE = 48;
 
-export const ResultsGrid = React.memo(function ResultsGrid({ products, isLoading, onUploadClick }: ResultsGridProps) {
+export const ResultsGrid = React.memo(function ResultsGrid({ products, onUploadClick }: ResultsGridProps) {
   const viewMode = useSettingsStore(state => state.viewMode);
   const setViewMode = useSettingsStore(state => state.setViewMode);
 
@@ -146,7 +145,7 @@ export const ResultsGrid = React.memo(function ResultsGrid({ products, isLoading
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasMore, products.length, viewMode, isLoading]);
+  }, [hasMore, products.length, viewMode]);
 
   const visibleProducts = useMemo(
     () => (products.length > visibleCount ? products.slice(0, visibleCount) : products),
@@ -195,53 +194,6 @@ export const ResultsGrid = React.memo(function ResultsGrid({ products, isLoading
       </button>
     </div>
   );
-
-  if (isLoading) {
-    return (
-      <div className="pt-4">
-        {viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {[...Array(8)].map((_, i) => (
-              <div
-                key={i}
-                className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-soft)] overflow-hidden"
-              >
-                <div className="aspect-square bg-[var(--bg-secondary)] animate-shimmer rounded-t-xl" />
-                <div className="p-4 space-y-3">
-                  <div className="h-2 bg-[var(--bg-secondary)] animate-shimmer rounded-full w-full" />
-                  <div className="h-2 bg-[var(--bg-secondary)] animate-shimmer rounded-full w-4/5" />
-                  <div className="h-2 bg-[var(--bg-secondary)] animate-shimmer rounded-full w-3/5" />
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <div className="h-12 bg-[var(--bg-secondary)] animate-shimmer rounded-lg" />
-                    <div className="h-12 bg-[var(--bg-secondary)] animate-shimmer rounded-lg" />
-                  </div>
-                  <div className="h-12 bg-[var(--bg-secondary)] animate-shimmer rounded-lg mt-1" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-0">
-            {[...Array(6)].map((_, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-4 py-4 border-b border-[var(--border-soft)]"
-              >
-                <div className="w-24 h-24 bg-[var(--bg-secondary)] animate-shimmer rounded-lg flex-shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3 bg-[var(--bg-secondary)] animate-shimmer rounded-full w-1/3" />
-                  <div className="h-3 bg-[var(--bg-secondary)] animate-shimmer rounded-full w-2/3" />
-                  <div className="h-2 bg-[var(--bg-secondary)] animate-shimmer rounded-full w-1/2" />
-                  <div className="h-4 bg-[var(--bg-secondary)] animate-shimmer rounded-full w-1/4" />
-                </div>
-                <div className="w-10 h-10 bg-[var(--bg-secondary)] animate-shimmer rounded-full flex-shrink-0" />
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
 
   if (products.length === 0) {
     return (
