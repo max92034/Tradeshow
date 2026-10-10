@@ -43,7 +43,7 @@ export const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div
         onClick={onClose}
         className={cn(
@@ -58,11 +58,10 @@ export const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose
         aria-label="Settings"
         tabIndex={-1}
         className={cn(
-          "fixed inset-x-0 bottom-0 sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2",
+          "relative w-full sm:max-w-lg",
           "flex flex-col",
-          "max-h-[calc(100dvh-2rem)]",
+          "max-h-full sm:max-h-[calc(100dvh-2rem)]",
           "bg-[var(--bg-card)] rounded-t-xl sm:rounded-xl",
-          "w-full sm:max-w-lg",
           "sm:shadow-[var(--shadow-xl)]",
           "animate-slide-up sm:animate-scale-enter"
         )}
