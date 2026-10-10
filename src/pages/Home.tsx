@@ -16,7 +16,6 @@ export default function Home() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const results = useSearchStore(state => state.results);
-  const query = useSearchStore(state => state.query);
   const isLoaded = useProductStore(state => state.isLoaded);
   const products = useProductStore(state => state.products);
   const isDrawerOpen = useOrderStore(state => state.isDrawerOpen);
@@ -43,13 +42,13 @@ export default function Home() {
         onSettingsClick={() => setSettingsOpen(true)}
       />
       
-      <main className="px-4 sm:px-8 py-6 sm:py-8 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-8 content-layer">
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-8 py-6 sm:py-8 pb-28 content-layer">
         {!isLoaded || products.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 sm:py-24 text-center animate-fade-in">
             <div className="w-24 h-24 bg-[var(--accent-soft)] rounded-3xl flex items-center justify-center mb-6 shadow-lg shadow-[var(--accent)]/10">
               <Package size={44} className="text-[var(--accent)]" strokeWidth={1.5} />
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)] mb-3" style={{ fontSize: 'var(--text-h1)' }}>
+            <h2 className="gradient-heading font-bold text-[var(--text-primary)] mb-3" style={{ fontSize: 'var(--text-h1)' }}>
               Welcome to TradeShow
             </h2>
             <p className="text-[var(--text-secondary)] mb-8 max-w-md leading-relaxed">
@@ -76,25 +75,7 @@ export default function Home() {
             </p>
           </div>
         ) : (
-          <>
-            <div className="flex items-center justify-between mb-5 sm:mb-6">
-              <p className="text-sm text-[var(--text-secondary)]">
-                {query ? (
-                  <span>
-                    <span className="font-semibold text-[var(--text-primary)]">{results.length}</span> results
-                    {results.length > 0 && (
-                      <span className="text-[var(--text-muted)]"> of {products.length}</span>
-                    )}
-                  </span>
-                ) : (
-                  <span>
-                    <span className="font-semibold text-[var(--text-primary)]">{products.length}</span> products
-                  </span>
-                )}
-              </p>
-            </div>
-            <ResultsGrid products={results} onUploadClick={() => setUploadOpen(true)} />
-          </>
+          <ResultsGrid products={results} onUploadClick={() => setUploadOpen(true)} />
         )}
       </main>
       
@@ -102,7 +83,7 @@ export default function Home() {
       <OrderDrawer isOpen={isDrawerOpen} onClose={() => toggleDrawer(false)} />
       <OrderHistoryModal isOpen={historyOpen} onClose={() => setHistoryOpen(false)} />
       <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
-      <VoiceSearchButton />
+      {isLoaded && products.length > 0 && <VoiceSearchButton />}
     </div>
   );
 }

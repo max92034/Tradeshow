@@ -6,7 +6,9 @@ This template provides a minimal setup to get React working in Vite with HMR and
 
 The frontend is deployed to GitHub Pages. Separately, `api/speech.ts` is a
 serverless proxy deployed to Vercel (`tradeshow-sigma.vercel.app`) — it is not
-part of the GitHub Pages site and is deployed independently.
+part of the GitHub Pages site and is deployed independently. It is excluded
+from the frontend build; type-check it with `npm run check:api`
+(uses `api/tsconfig.json` and `@vercel/node` types).
 
 Currently, two official plugins are available:
 

@@ -9,14 +9,7 @@ export default defineConfig(({ command }) => ({
     sourcemap: 'hidden',
   },
   plugins: [
-    react({
-      babel: {
-        // react-dev-locator stamps every element with trae-inspector-*
-        // source-location attributes — dev-only tooling that bloats the
-        // production bundle and DOM, so enable it only for `vite dev`.
-        plugins: command === 'serve' ? ['react-dev-locator'] : [],
-      },
-    }),
+    react(),
     tsconfigPaths()
   ],
 }))

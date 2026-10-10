@@ -1,11 +1,13 @@
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { Product } from '../types';
-import { loadFromStorage, saveToStorage, storageKeys } from '../utils/storage';
+import { createLegacyJsonStorage } from '../utils/legacyStorage';
 
 interface ProductState {
   products: Product[];
   isLoaded: boolean;
   version: number;
+  lastUpdated: string | null;
   loadProducts: (products: Product[]) => void;
   clearProducts: () => void;
   loadSampleData: () => Promise<void>;
@@ -40,34 +42,40 @@ function migrateProducts(products: Product[]): Product[] {
   return products.map(p => migrateProduct(p));
 }
 
-export const useProductStore = create<ProductState>((set, get) => ({
-  products: [],
-  isLoaded: false,
-  version: 0,
-  
-  loadProducts: (products: Product[]) => {
-    const migrated = migrateProducts(products);
-    const newVersion = get().version + 1;
-    set({ products: migrated, isLoaded: true, version: newVersion });
-    saveToStorage(storageKeys.PRODUCTS, migrated);
-  },
-  
-  clearProducts: () => {
-    const newVersion = get().version + 1;
-    set({ products: [], isLoaded: false, version: newVersion });
-    saveToStorage(storageKeys.PRODUCTS, []);
-  },
-  
-  loadSampleData: async () => {
-    const { sampleProducts } = await import('../data/sampleProducts');
-    const newVersion = get().version + 1;
-    set({ products: sampleProducts, isLoaded: true, version: newVersion });
-    saveToStorage(storageKeys.PRODUCTS, sampleProducts);
-  },
-}));
+export const useProductStore = create<ProductState>()(
+  persist(
+    (set, get) => ({
+      products: [],
+      isLoaded: false,
+      version: 0,
+      lastUpdated: null,
 
-const cachedProducts = loadFromStorage<Product[]>(storageKeys.PRODUCTS);
-if (cachedProducts && cachedProducts.length > 0) {
-  const migrated = migrateProducts(cachedProducts);
-  useProductStore.setState({ products: migrated, isLoaded: true });
-}
+      loadProducts: (products: Product[]) => {
+        const migrated = migrateProducts(products);
+        const newVersion = get().version + 1;
+        set({ products: migrated, isLoaded: true, version: newVersion, lastUpdated: new Date().toISOString() });
+      },
+
+      clearProducts: () => {
+        const newVersion = get().version + 1;
+        set({ products: [], isLoaded: false, version: newVersion, lastUpdated: null });
+      },
+
+      loadSampleData: async () => {
+        const { sampleProducts } = await import('../data/sampleProducts');
+        const newVersion = get().version + 1;
+        set({ products: sampleProducts, isLoaded: true, version: newVersion, lastUpdated: new Date().toISOString() });
+      },
+    }),
+    {
+      name: 'tradeshow_products',
+      storage: createJSONStorage(() =>
+        createLegacyJsonStorage<Product[]>((legacy) => ({
+          products: Array.isArray(legacy) ? migrateProducts(legacy) : [],
+          isLoaded: Array.isArray(legacy) && legacy.length > 0,
+        }))
+      ),
+      partialize: (state) => ({ products: state.products, isLoaded: state.isLoaded, lastUpdated: state.lastUpdated }),
+    }
+  )
+);

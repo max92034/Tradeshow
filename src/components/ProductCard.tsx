@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { Package, Check } from 'lucide-react';
 import { Product } from '../types';
-import { formatPrice, productImageUrl } from '../utils/formatters';
+import { formatPrice, productImageUrl, productImageFallbackUrl } from '../utils/formatters';
 import { useOrderStore } from '../store/useOrderStore';
 import { cn } from '../lib/utils';
 
@@ -12,10 +12,9 @@ interface ProductCardProps {
 interface InfoCellProps {
   label: string;
   value: React.ReactNode;
-  isPrice?: boolean;
 }
 
-const InfoCell = ({ label, value, isPrice }: InfoCellProps) => (
+const InfoCell = ({ label, value }: InfoCellProps) => (
   <div
     className="rounded-lg p-3"
     style={{ background: 'var(--bg-secondary)' }}
@@ -30,10 +29,9 @@ const InfoCell = ({ label, value, isPrice }: InfoCellProps) => (
       {label}
     </div>
     <div
-      className={cn(isPrice && 'font-mono font-bold')}
       style={{
         fontSize: 'var(--text-small)',
-        color: isPrice ? 'var(--accent)' : 'var(--text-secondary)',
+        color: 'var(--text-secondary)',
       }}
     >
       {value}
@@ -44,6 +42,7 @@ const InfoCell = ({ label, value, isPrice }: InfoCellProps) => (
 export const ProductCard = React.memo(function ProductCard({ product }: ProductCardProps) {
   const [added, setAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [usedFallback, setUsedFallback] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addItem = useOrderStore(state => state.addItem);
 
@@ -58,7 +57,7 @@ export const ProductCard = React.memo(function ProductCard({ product }: ProductC
     timeoutRef.current = setTimeout(() => {
       setAdded(false);
       timeoutRef.current = null;
-    }, 200);
+    }, 600);
   }, [addItem, product]);
 
   const hasDims = product.length > 0 || product.width > 0 || product.height > 0;
@@ -71,8 +70,9 @@ export const ProductCard = React.memo(function ProductCard({ product }: ProductC
     : '';
 
   const imgSrc = productImageUrl(product.sku, product.imageUrl);
+  const fallbackSrc = productImageFallbackUrl(product.sku, product.imageUrl);
 
-  const hasAnyInfo = hasDims || hasWeight || hasCartonQty || hasPrice;
+  const hasAnyInfo = hasDims || hasWeight || hasCartonQty;
 
   return (
     <div
@@ -85,30 +85,43 @@ export const ProductCard = React.memo(function ProductCard({ product }: ProductC
       <div
         className="relative w-full overflow-hidden"
         style={{
-          aspectRatio: '1/1',
+          aspectRatio: '4/3',
           borderTopLeftRadius: 'var(--radius-lg)',
           borderTopRightRadius: 'var(--radius-lg)',
         }}
       >
         {imgSrc && !imgError ? (
           <img
-            src={imgSrc}
+            src={usedFallback ? fallbackSrc : imgSrc}
             alt={product.description}
             style={{
               width: '100%',
               height: '100%',
-              objectFit: 'cover',
+              objectFit: 'contain',
+              background: 'var(--bg-secondary)',
             }}
             loading="lazy"
             decoding="async"
-            onError={() => setImgError(true)}
+            onError={() => {
+              if (!usedFallback && fallbackSrc) {
+                setUsedFallback(true);
+              } else {
+                setImgError(true);
+              }
+            }}
           />
         ) : (
           <div
-            className="w-full h-full flex items-center justify-center"
+            className="w-full h-full flex flex-col items-center justify-center gap-1"
             style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}
           >
             <Package size={36} strokeWidth={1.5} />
+            <span
+              className="font-mono"
+              style={{ fontSize: 'var(--text-caption)' }}
+            >
+              {product.sku}
+            </span>
           </div>
         )}
 
@@ -130,14 +143,24 @@ export const ProductCard = React.memo(function ProductCard({ product }: ProductC
 
       <div className="flex-1 p-4 flex flex-col min-h-0 gap-3">
         <div className="space-y-1">
-          <div
-            className="font-mono font-semibold"
-            style={{
-              fontSize: '15px',
-              color: 'var(--text-primary)',
-            }}
-          >
-            {product.sku}
+          <div className="flex items-baseline justify-between gap-2">
+            <div
+              className="font-mono font-semibold"
+              style={{
+                fontSize: '15px',
+                color: 'var(--text-primary)',
+              }}
+            >
+              {product.sku}
+            </div>
+            {hasPrice && (
+              <div
+                className="font-mono font-bold flex-shrink-0"
+                style={{ fontSize: '19px', color: 'var(--accent)' }}
+              >
+                {formatPrice(product.fobPrice)}
+              </div>
+            )}
           </div>
           <p
             className="line-clamp-2"
@@ -160,9 +183,6 @@ export const ProductCard = React.memo(function ProductCard({ product }: ProductC
             )}
             {hasCartonQty && (
               <InfoCell label="Carton" value={`${product.cartonQty}/CTN`} />
-            )}
-            {hasPrice && (
-              <InfoCell label="Price" value={formatPrice(product.fobPrice)} isPrice />
             )}
           </div>
         )}

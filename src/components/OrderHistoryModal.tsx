@@ -4,6 +4,7 @@ import { useOrderStore } from '../store/useOrderStore';
 import { formatPrice } from '../utils/formatters';
 import { Order } from '../types';
 import { cn } from '../lib/utils';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 interface OrderHistoryModalProps {
   isOpen: boolean;
@@ -30,6 +31,7 @@ export function OrderHistoryModal({ isOpen, onClose }: OrderHistoryModalProps) {
   const loadOrder = useOrderStore(state => state.loadOrder);
   const deleteOrder = useOrderStore(state => state.deleteOrder);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const modalRef = useModalA11y(isOpen, onClose);
 
   const handleLoad = (order: Order) => {
     loadOrder(order.id);
@@ -55,6 +57,11 @@ export function OrderHistoryModal({ isOpen, onClose }: OrderHistoryModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-modal">
       <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Saved Quotations"
+        tabIndex={-1}
         className="bg-[var(--bg-card)] w-full sm:max-w-lg sm:rounded-xl rounded-t-xl sm:shadow-xl shadow-2xl max-h-[85vh] flex flex-col animate-slide-up sm:animate-scale-enter"
       >
         <div className="flex items-center justify-between px-6 py-6 pb-4 border-b border-[var(--border-soft)] flex-shrink-0">

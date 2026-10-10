@@ -48,7 +48,12 @@ const COLUMN_MAP: Record<string, keyof Product> = {
   'keywords': 'keyword',
 };
 
-export async function parseExcelFile(file: File): Promise<Product[]> {
+export interface ParseResult {
+  products: Product[];
+  duplicateSkus: string[];
+}
+
+export async function parseExcelFile(file: File): Promise<ParseResult> {
   // xlsx is ~400KB minified — load it only when a file is actually parsed
   // so it stays out of the initial bundle.
   const XLSX = await import('xlsx');
@@ -62,12 +67,17 @@ export async function parseExcelFile(file: File): Promise<Product[]> {
         const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as unknown[][];
         
         if (jsonData.length < 2) {
-          resolve([]);
-          return;
+          throw new Error('No valid product rows found — check that the first row contains headers like SKU, Description');
         }
 
         const headers = (jsonData[0] as string[]).map(h => String(h || '').trim().toLowerCase());
+        if (!headers.includes('sku')) {
+          throw new Error('No valid product rows found — check that the first row contains headers like SKU, Description');
+        }
+
         const products: Product[] = [];
+        const duplicateSkus: string[] = [];
+        const seenSkus = new Set<string>();
 
         for (let i = 1; i < jsonData.length; i++) {
           const row = jsonData[i];
@@ -119,11 +129,21 @@ export async function parseExcelFile(file: File): Promise<Product[]> {
 
           product.imageUrl = normalizeImageUrl(product.imageUrl);
           if (product.sku) {
+            const skuKey = product.sku.toLowerCase();
+            if (seenSkus.has(skuKey)) {
+              duplicateSkus.push(product.sku);
+              continue;
+            }
+            seenSkus.add(skuKey);
             products.push(product);
           }
         }
 
-        resolve(products);
+        if (products.length === 0) {
+          throw new Error('No valid product rows found — check that the first row contains headers like SKU, Description');
+        }
+
+        resolve({ products, duplicateSkus });
       } catch (err) {
         reject(err);
       }

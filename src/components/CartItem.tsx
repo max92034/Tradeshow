@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { Trash2, Package } from 'lucide-react';
 import { OrderItem } from '../types';
-import { formatPrice, productImageUrl } from '../utils/formatters';
+import { formatPrice, productImageUrl, productImageFallbackUrl } from '../utils/formatters';
 import { useOrderStore } from '../store/useOrderStore';
 import { cn } from '../lib/utils';
 
@@ -11,6 +12,16 @@ interface CartItemProps {
 
 export function CartItem({ item, isLast = false }: CartItemProps) {
   const removeItem = useOrderStore(state => state.removeItem);
+  const [usedFallback, setUsedFallback] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
+  const imgSrc = productImageUrl(item.sku, item.imageUrl);
+  const fallbackSrc = productImageFallbackUrl(item.sku, item.imageUrl);
+
+  const placeholder = (
+    <div className="w-full h-full flex items-center justify-center">
+      <Package size={20} style={{ color: 'var(--text-muted)' }} />
+    </div>
+  );
 
   return (
     <div className={cn(
@@ -21,19 +32,21 @@ export function CartItem({ item, isLast = false }: CartItemProps) {
         className="w-16 h-16 flex-shrink-0 overflow-hidden rounded-lg"
         style={{ background: 'var(--bg-secondary)' }}
       >
-        {productImageUrl(item.sku, item.imageUrl) ? (
+        {imgSrc && !imgFailed ? (
           <img
-            src={productImageUrl(item.sku, item.imageUrl)}
+            src={usedFallback ? fallbackSrc : imgSrc}
             alt={item.description}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
+            className="w-full h-full object-contain"
+            onError={() => {
+              if (!usedFallback && fallbackSrc) {
+                setUsedFallback(true);
+              } else {
+                setImgFailed(true);
+              }
             }}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Package size={20} style={{ color: 'var(--text-muted)' }} />
-          </div>
+          placeholder
         )}
       </div>
       

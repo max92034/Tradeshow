@@ -1,6 +1,6 @@
 import { Download, Mail, FileText, AlertTriangle } from 'lucide-react';
 import { useOrderStore } from '../store/useOrderStore';
-import { useToast } from './Toast';
+import { useToast } from '../store/useToastStore';
 import { formatPrice } from '../utils/formatters';
 import { cn } from '../lib/utils';
 import { getCountryByCode } from '../data/countries';
@@ -9,7 +9,11 @@ function validateBuyer(buyer: ReturnType<typeof useOrderStore.getState>['current
   const errors: string[] = [];
   if (!buyer?.name?.trim()) errors.push('Buyer Name');
   if (!buyer?.company?.trim()) errors.push('Company');
-  if (!buyer?.email?.trim()) errors.push('Email');
+  if (!buyer?.email?.trim()) {
+    errors.push('Email');
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(buyer.email.trim())) {
+    errors.push('Email (invalid format)');
+  }
   if (!buyer?.nationality) errors.push('Nationality');
   return errors;
 }
@@ -120,6 +124,22 @@ export function OrderSummary() {
     
     if (buyer?.notes) {
       body += `\nNotes:\n${'-'.repeat(40)}\n${buyer.notes}\n`;
+    }
+    
+    // mailto: URLs break around ~2000 chars in common browsers/mail clients —
+    // truncate the body at a line boundary and warn the user.
+    if (encodeURIComponent(body).length > 1800) {
+      let truncated = body;
+      while (encodeURIComponent(truncated).length > 1800) {
+        const cut = truncated.lastIndexOf('\n');
+        if (cut === -1) {
+          truncated = truncated.slice(0, 600);
+          break;
+        }
+        truncated = truncated.slice(0, cut);
+      }
+      body = truncated + '\n\n[...truncated — use Export Excel for the full quote]\n';
+      addToast('Quote is long — the email was truncated. Use Export Excel for the full details.', 'warning', 5000);
     }
     
     const mailto = `mailto:${buyer?.email || ''}?subject=${subject}&body=${encodeURIComponent(body)}`;

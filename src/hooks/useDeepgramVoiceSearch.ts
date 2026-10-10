@@ -1,5 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useSettingsStore } from '../store/useSettingsStore';
+import {
+  acquireMicStream,
+  createMediaRecorder,
+  detectIOS,
+  stopStreamTracks,
+} from '../utils/audioRecorder';
 
 interface UseVoiceSearchOptions {
   onResult: (text: string) => void;
@@ -33,12 +39,7 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
     if (typeof MediaRecorder !== 'undefined' && typeof navigator !== 'undefined' && navigator.mediaDevices) {
       setIsSupported(true);
     }
-    if (typeof navigator !== 'undefined') {
-      const ua = navigator.userAgent || '';
-      const isIOSDevice = /iPad|iPhone|iPod/.test(ua) ||
-        (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1);
-      isIOSRef.current = isIOSDevice;
-    }
+    isIOSRef.current = detectIOS();
   }, []);
 
   useEffect(() => {
@@ -46,7 +47,7 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
       if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
       if (abortControllerRef.current) abortControllerRef.current.abort();
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
+        stopStreamTracks(streamRef.current);
       }
       if (audioContextRef.current) {
         audioContextRef.current.close().catch(() => {});
@@ -57,48 +58,18 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
   function getApiUrl(): string {
     const customUrl = import.meta.env.VITE_DEEPGRAM_API_URL;
     if (customUrl) return customUrl;
-    
+
     const vercelApiUrl = import.meta.env.VITE_VERCEL_API_URL;
     if (vercelApiUrl) return vercelApiUrl + '/api/speech';
-    
+
     if (typeof window !== 'undefined') {
       const host = window.location.hostname;
       if (host.endsWith('github.io') || host === 'localhost') {
         return 'https://tradeshow-sigma.vercel.app/api/speech';
       }
     }
-    
-    return '/api/speech';
-  }
 
-  function getBestAudioMimeType(): string {
-    const isIOS = isIOSRef.current;
-    
-    if (isIOS) {
-      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/mp4')) {
-        return 'audio/mp4';
-      }
-      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm')) {
-        return 'audio/webm';
-      }
-      return 'audio/mp4';
-    }
-    
-    const types = [
-      'audio/webm;codecs=opus',
-      'audio/webm',
-      'audio/mp4',
-      'audio/ogg;codecs=opus',
-      'audio/ogg',
-    ];
-    
-    for (const type of types) {
-      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(type)) {
-        return type;
-      }
-    }
-    
-    return 'audio/webm';
+    return '/api/speech';
   }
 
   const sendAudioForTranscription = useCallback(async (audioBlob: Blob, mimeType?: string) => {
@@ -112,10 +83,10 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
-    
+
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
-    
+
     const timeoutId = setTimeout(() => {
       abortController.abort();
     }, 15000);
@@ -182,7 +153,7 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
       if (isIOS) {
         setTimeout(() => {
           if (streamRef.current) {
-            streamRef.current.getTracks().forEach(t => t.stop());
+            stopStreamTracks(streamRef.current);
             streamRef.current = null;
           }
           mediaRecorderRef.current = null;
@@ -213,7 +184,7 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
     }
     // Also clean up all stream tracks immediately
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
+      stopStreamTracks(streamRef.current);
       streamRef.current = null;
     }
 
@@ -232,30 +203,7 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
     const isIOS = isIOSRef.current;
 
     try {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
-        streamRef.current = null;
-      }
-
-      // NOTE: getUserMedia must run as early as possible in the user-gesture
-      // call stack. On iOS Safari, awaiting anything (e.g. AudioContext.resume)
-      // before this call can make the permission prompt never appear.
-      // Also: do NOT route this stream through WebAudio on iOS — a known bug
-      // makes MediaRecorder capture silence when the same stream is consumed
-      // by an AudioContext, which is exactly the "no speech recognized"
-      // failure seen on iPhone.
-      const constraints: MediaStreamConstraints = {
-        audio: isIOS
-          ? true
-          : {
-              echoCancellation: false,
-              noiseSuppression: false,
-              autoGainControl: true,
-              channelCount: 1,
-            },
-      };
-
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      const stream = await acquireMicStream(isIOS);
       streamRef.current = stream;
 
       if (!isIOS && typeof window !== 'undefined') {
@@ -275,34 +223,8 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
         }
       }
 
-      const audioTracks = stream.getAudioTracks();
-      if (audioTracks.length === 0) {
-        throw new Error('No audio track available');
-      }
-      const track = audioTracks[0];
-      if (!track.enabled) track.enabled = true;
-
-      const mimeType = getBestAudioMimeType();
+      const { recorder, mimeType } = createMediaRecorder(stream, isIOS);
       mimeTypeRef.current = mimeType;
-
-      const recorderOptions: MediaRecorderOptions = {};
-      if (mimeType) {
-        recorderOptions.mimeType = mimeType;
-      }
-      if (!isIOS) {
-        recorderOptions.audioBitsPerSecond = 128000;
-      }
-
-      // Try the preferred MIME type; fall back to the browser default.
-      let recorder: MediaRecorder;
-      try {
-        recorder = new MediaRecorder(stream, recorderOptions);
-      } catch {
-        // Fallback: let browser pick default MIME type
-        recorder = new MediaRecorder(stream);
-      }
-      // Capture actual MIME type from the created recorder
-      mimeTypeRef.current = recorder.mimeType || mimeTypeRef.current || 'audio/webm';
 
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
@@ -378,7 +300,7 @@ export function useDeepgramVoiceSearch({ onResult, lang }: UseVoiceSearchOptions
         setError('Could not start: ' + (err.message || 'Unknown error'));
       }
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
+        stopStreamTracks(streamRef.current);
         streamRef.current = null;
       }
     }

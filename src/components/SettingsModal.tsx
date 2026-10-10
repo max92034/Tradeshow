@@ -5,6 +5,7 @@ import { useSettingsStore, type ThemeMode } from '../store/useSettingsStore';
 import { useProductStore } from '../store/useProductStore';
 import { useSearchStore } from '../store/useSearchStore';
 import { downloadBlankTemplate } from '../utils/excelParser';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -27,8 +28,10 @@ export const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose
   const voiceLanguage = useSettingsStore(state => state.voiceLanguage);
   const toggleVoiceLanguage = useSettingsStore(state => state.toggleVoiceLanguage);
   const productCount = useProductStore(state => state.products.length);
+  const lastUpdated = useProductStore(state => state.lastUpdated);
   const clearProducts = useProductStore(state => state.clearProducts);
   const performSearch = useSearchStore(state => state.performSearch);
+  const modalRef = useModalA11y(isOpen, onClose);
 
   const handlePurge = () => {
     if (window.confirm('Remove all loaded catalog data from this device? Saved orders are kept.')) {
@@ -49,9 +52,15 @@ export const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose
       />
 
       <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Settings"
+        tabIndex={-1}
         className={cn(
           "fixed inset-x-0 bottom-0 sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2",
           "flex flex-col",
+          "max-h-[calc(100dvh-2rem)]",
           "bg-[var(--bg-card)] rounded-t-xl sm:rounded-xl",
           "w-full sm:max-w-lg",
           "sm:shadow-[var(--shadow-xl)]",
@@ -87,8 +96,8 @@ export const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose
         </div>
 
         <div
-          className="overflow-y-auto"
-          style={{ padding: '16px 24px', maxHeight: '70vh' }}
+          className="overflow-y-auto flex-1 min-h-0"
+          style={{ padding: '16px 24px' }}
         >
           <div className="space-y-6">
             <div className="space-y-3">
@@ -199,6 +208,12 @@ export const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose
                 style={{ fontSize: 'var(--text-small)', color: 'var(--text-muted)' }}
               >
                 {productCount > 0 ? `${productCount} products loaded` : 'No catalog loaded'}
+                {lastUpdated && productCount > 0 && (
+                  <>
+                    {' · Catalog updated: '}
+                    {new Date(lastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </>
+                )}
               </p>
               <div className="space-y-2">
                 <button

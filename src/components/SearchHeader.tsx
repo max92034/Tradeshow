@@ -1,11 +1,11 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
-import { Search, ShoppingCart, History, X, Settings, Menu, Sun, Moon, Sparkles, Mic, Upload, Trophy } from 'lucide-react';
-import { VoiceIcon } from './VoiceIcon';
+import { Search, ShoppingCart, History, X, Settings } from 'lucide-react';
+import { MobileMenu } from './MobileMenu';
+import { VoiceToggleButton } from './VoiceToggleButton';
 import { useSearchStore } from '../store/useSearchStore';
 import { useOrderStore } from '../store/useOrderStore';
-import { useDeepgramVoiceSearch } from '../hooks/useDeepgramVoiceSearch';
+import { useVoiceSearchToQuery } from '../hooks/useVoiceSearchToQuery';
 import { useDebounce } from '../hooks/useDebounce';
-import { useSettingsStore, ThemeMode } from '../store/useSettingsStore';
 import { cn } from '../lib/utils';
 
 interface SearchHeaderProps {
@@ -13,20 +13,6 @@ interface SearchHeaderProps {
   onHistoryClick: () => void;
   onSettingsClick: () => void;
 }
-
-const themeIconMap: Record<ThemeMode, React.ReactNode> = {
-  light: <Sun size={18} strokeWidth={1.5} />,
-  dark: <Moon size={18} strokeWidth={1.5} />,
-  gold: <Sparkles size={18} strokeWidth={1.5} />,
-  lakers: <Trophy size={18} strokeWidth={1.5} />,
-};
-
-const themeLabelMap: Record<ThemeMode, string> = {
-  light: 'Light',
-  dark: 'Dark',
-  gold: 'Gold',
-  lakers: 'Lakers',
-};
 
 export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, onHistoryClick, onSettingsClick }: SearchHeaderProps) {
   const query = useSearchStore(state => state.query);
@@ -36,21 +22,12 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
 
   const totalItems = useOrderStore(state => state.currentOrder.totalItems);
   const toggleDrawer = useOrderStore(state => state.toggleDrawer);
-  const voiceLanguage = useSettingsStore(state => state.voiceLanguage);
-  const toggleVoiceLanguage = useSettingsStore(state => state.toggleVoiceLanguage);
-  const theme = useSettingsStore(state => state.theme);
-  const toggleTheme = useSettingsStore(state => state.toggleTheme);
+
+  const [badgeBump, setBadgeBump] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
 
-  const { isListening, isSupported: voiceSupported, startListening, stopListening } = useDeepgramVoiceSearch({
-    onResult: useCallback((text) => {
-      setQuery(text);
-      performSearch(text);
-    }, [setQuery, performSearch]),
-  });
+  const { isListening, isSupported: voiceSupported, startListening, stopListening } = useVoiceSearchToQuery();
 
   const handleVoiceToggle = useCallback(() => {
     if (isListening) {
@@ -64,19 +41,14 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
     performSearch(debouncedQuery);
   }, [debouncedQuery, performSearch]);
 
-  const closeMenu = useCallback(() => setMenuOpen(false), []);
-
+  const prevTotalItemsRef = useRef(totalItems);
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    if (menuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [menuOpen]);
+    if (totalItems === prevTotalItemsRef.current) return;
+    prevTotalItemsRef.current = totalItems;
+    setBadgeBump(true);
+    const timer = setTimeout(() => setBadgeBump(false), 300);
+    return () => clearTimeout(timer);
+  }, [totalItems]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setQuery(e.target.value);
@@ -87,16 +59,6 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
     performSearch('');
     inputRef.current?.focus();
   }, [setQuery, performSearch]);
-
-  const handleThemeToggle = useCallback(() => {
-    toggleTheme();
-    closeMenu();
-  }, [toggleTheme, closeMenu]);
-
-  const handleVoiceLanguageToggle = useCallback(() => {
-    toggleVoiceLanguage();
-    closeMenu();
-  }, [toggleVoiceLanguage, closeMenu]);
 
   return (
     <header
@@ -144,7 +106,7 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
                 {query && (
                   <button
                     onClick={handleClear}
-                    className="p-1.5 rounded-full transition-colors"
+                    className="p-2.5 rounded-full transition-colors"
                     style={{ color: 'var(--text-muted)' }}
                     aria-label="Clear search"
                   >
@@ -152,22 +114,11 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
                   </button>
                 )}
                 {voiceSupported && (
-                  <button
-                    onClick={handleVoiceToggle}
-                    className={cn(
-                      "hidden sm:inline-flex items-center justify-center w-9 h-9 rounded-full transition-all duration-200",
-                      isListening
-                        ? "bg-[var(--accent)] text-[var(--text-inverse)]"
-                        : "hover:bg-[var(--accent-soft)]"
-                    )}
-                    style={{
-                      color: isListening ? 'var(--text-inverse)' : 'var(--accent)',
-                      backgroundColor: isListening ? 'var(--accent)' : 'var(--accent-soft)',
-                    }}
-                    aria-label={isListening ? "Stop voice search" : "Start voice search"}
-                  >
-                    <VoiceIcon size={18} active={isListening} />
-                  </button>
+                  <VoiceToggleButton
+                    isListening={isListening}
+                    onToggle={handleVoiceToggle}
+                    variant="desktop"
+                  />
                 )}
               </div>
             </div>
@@ -175,194 +126,22 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
 
           <div className="flex items-center gap-2">
             {voiceSupported && (
-              <button
-                onClick={handleVoiceToggle}
-                className={cn(
-                  "sm:hidden inline-flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 active:scale-95",
-                )}
-                style={{
-                  color: 'var(--accent)',
-                  backgroundColor: 'var(--accent-soft)',
-                }}
-                aria-label={isListening ? "Stop voice search" : "Start voice search"}
-              >
-                <VoiceIcon size={18} active={isListening} />
-              </button>
+              <VoiceToggleButton
+                isListening={isListening}
+                onToggle={handleVoiceToggle}
+                variant="mobile"
+              />
             )}
 
-            <div className="relative sm:hidden" ref={menuRef}>
-              <button
-                onClick={() => setMenuOpen(!menuOpen)}
-                className="inline-flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 active:scale-95"
-                style={{
-                  color: 'var(--text-secondary)',
-                  backgroundColor: 'var(--bg-secondary)',
-                }}
-                aria-label={menuOpen ? "Close menu" : "Open menu"}
-                aria-expanded={menuOpen}
-              >
-                {menuOpen ? <X size={20} strokeWidth={1.5} /> : <Menu size={20} strokeWidth={1.5} />}
-              </button>
-
-              <div
-                className={cn(
-                  "absolute right-0 top-12 w-64 rounded-2xl shadow-xl overflow-hidden z-50",
-                  "transition-all duration-200 origin-top-right",
-                  menuOpen ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"
-                )}
-                style={{
-                  backgroundColor: 'var(--bg-card)',
-                  border: '1px solid var(--border)',
-                }}
-              >
-                <button
-                  onClick={() => {
-                    onSettingsClick();
-                    closeMenu();
-                  }}
-                  className="w-full flex items-center gap-3 px-4 py-3.5 transition-all duration-200"
-                  style={{ color: 'var(--text-secondary)' }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
-                    e.currentTarget.style.color = 'var(--text-primary)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = 'var(--text-secondary)';
-                  }}
-                >
-                  <Settings size={18} strokeWidth={1.5} />
-                  <div className="flex-1 text-left">
-                    <div className="font-medium text-sm">Settings</div>
-                    <div className="text-xs" style={{ color: 'var(--text-muted)' }}>设置</div>
-                  </div>
-                </button>
-
-                <button
-                  onClick={handleThemeToggle}
-                  className="w-full flex items-center gap-3 px-4 py-3.5 transition-all duration-200"
-                  style={{
-                    color: 'var(--text-secondary)',
-                    borderTop: '1px solid var(--border-soft)',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
-                    e.currentTarget.style.color = 'var(--text-primary)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = 'var(--text-secondary)';
-                  }}
-                >
-                  {themeIconMap[theme]}
-                  <div className="flex-1 text-left">
-                    <div className="font-medium text-sm">
-                      Theme: {themeLabelMap[theme]}
-                    </div>
-                    <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                      Tap to switch / 点击切换
-                    </div>
-                  </div>
-                  <div
-                    className="px-2 py-0.5 rounded-full text-xs font-bold"
-                    style={{
-                      backgroundColor: 'var(--accent-soft)',
-                      color: 'var(--accent)',
-                    }}
-                  >
-                    {theme === 'light' ? '☀' : theme === 'dark' ? '☾' : '✨'}
-                  </div>
-                </button>
-
-                <button
-                  onClick={handleVoiceLanguageToggle}
-                  className="w-full flex items-center gap-3 px-4 py-3.5 transition-all duration-200"
-                  style={{
-                    color: 'var(--text-secondary)',
-                    borderTop: '1px solid var(--border-soft)',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
-                    e.currentTarget.style.color = 'var(--text-primary)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = 'var(--text-secondary)';
-                  }}
-                >
-                  <Mic size={18} strokeWidth={1.5} />
-                  <div className="flex-1 text-left">
-                    <div className="font-medium text-sm">
-                      Voice: {voiceLanguage === 'zh-CN' ? '中文' : 'English'}
-                    </div>
-                    <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                      Tap to switch / 点击切换
-                    </div>
-                  </div>
-                  <div
-                    className="px-2 py-0.5 rounded-full text-xs font-bold"
-                    style={{
-                      backgroundColor: 'var(--accent-soft)',
-                      color: 'var(--accent)',
-                    }}
-                  >
-                    {voiceLanguage === 'zh-CN' ? '中' : 'EN'}
-                  </div>
-                </button>
-
-                <div style={{ borderTop: '1px solid var(--border-soft)' }}>
-                  <button
-                    onClick={() => {
-                      onHistoryClick();
-                      closeMenu();
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 transition-all duration-200"
-                    style={{ color: 'var(--text-secondary)' }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
-                      e.currentTarget.style.color = 'var(--text-primary)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = 'var(--text-secondary)';
-                    }}
-                  >
-                    <History size={18} strokeWidth={1.5} />
-                    <div className="flex-1 text-left">
-                      <div className="font-medium text-sm">Order History</div>
-                      <div className="text-xs" style={{ color: 'var(--text-muted)' }}>订单历史</div>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      onUploadClick();
-                      closeMenu();
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 transition-all duration-200"
-                    style={{ color: 'var(--text-secondary)' }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
-                      e.currentTarget.style.color = 'var(--text-primary)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = 'var(--text-secondary)';
-                    }}
-                  >
-                    <Upload size={18} strokeWidth={1.5} />
-                    <div className="flex-1 text-left">
-                      <div className="font-medium text-sm">Upload Products</div>
-                      <div className="text-xs" style={{ color: 'var(--text-muted)' }}>上传产品</div>
-                    </div>
-                  </button>
-                </div>
-              </div>
-            </div>
+            <MobileMenu
+              onUploadClick={onUploadClick}
+              onHistoryClick={onHistoryClick}
+              onSettingsClick={onSettingsClick}
+            />
 
             <button
               onClick={onSettingsClick}
-              className="hidden sm:inline-flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 active:scale-95 shadow-sm"
+              className="hidden sm:inline-flex items-center justify-center w-11 h-11 rounded-full transition-all duration-200 active:scale-95 shadow-sm"
               style={{
                 color: 'var(--text-inverse)',
                 backgroundColor: 'var(--accent)',
@@ -381,7 +160,7 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
 
             <button
               onClick={onHistoryClick}
-              className="hidden sm:inline-flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 active:scale-95"
+              className="hidden sm:inline-flex items-center justify-center w-11 h-11 rounded-full transition-all duration-200 active:scale-95"
               style={{
                 color: 'var(--text-secondary)',
                 backgroundColor: 'var(--bg-secondary)',
@@ -401,7 +180,7 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
 
             <button
               onClick={() => toggleDrawer(true)}
-              className="relative inline-flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 active:scale-95 shadow-md"
+              className="relative inline-flex items-center justify-center w-11 h-11 rounded-full transition-all duration-200 active:scale-95 shadow-md"
               style={{
                 backgroundColor: 'var(--accent)',
                 color: 'var(--text-inverse)',
@@ -412,10 +191,14 @@ export const SearchHeader = React.memo(function SearchHeader({ onUploadClick, on
               <ShoppingCart size={20} strokeWidth={1.5} />
               {totalItems > 0 && (
                 <span
-                  className="absolute -top-1 -right-1 min-w-5 h-5 px-1 text-xs font-bold rounded-full flex items-center justify-center"
+                  className={cn(
+                    "absolute -top-1 -right-1 min-w-5 h-5 px-1 text-xs font-bold rounded-full flex items-center justify-center",
+                    "transition-transform duration-300 ease-out",
+                    badgeBump && "scale-125"
+                  )}
                   style={{
                     backgroundColor: 'var(--danger)',
-                    color: 'var(--text-inverse)',
+                    color: 'var(--on-danger, #fff)',
                   }}
                 >
                   {totalItems > 99 ? '99+' : totalItems}

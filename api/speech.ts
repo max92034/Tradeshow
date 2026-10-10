@@ -11,10 +11,37 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const ALLOWED_ORIGINS = [
-  /^https:\/\/.*\.vercel\.app$/,
+  /^https:\/\/tradeshow-sigma\.vercel\.app$/,
   /^https:\/\/max92034\.github\.io$/,
   /^http:\/\/localhost:\d+$/,
 ];
+
+// ~10MB raw audio; base64 expands ~4/3, multipart adds framing overhead.
+const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
+const MAX_BASE64_CHARS = Math.ceil(MAX_AUDIO_BYTES / 3) * 4 + 1024;
+const MAX_BODY_BYTES = MAX_AUDIO_BYTES + 64 * 1024;
+
+// Best-effort per-IP rate limit (in-memory; per serverless instance).
+const RATE_LIMIT = 30;
+const RATE_WINDOW_MS = 60 * 1000;
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now >= entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    // Bound memory: drop expired entries when the map grows large.
+    if (rateLimitMap.size > 1000) {
+      for (const [key, value] of rateLimitMap) {
+        if (now >= value.resetAt) rateLimitMap.delete(key);
+      }
+    }
+    return false;
+  }
+  entry.count++;
+  return entry.count > RATE_LIMIT;
+}
 
 function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
   const origin = req.headers.origin || '';
@@ -39,8 +66,16 @@ async function parseFormData(req: VercelRequest): Promise<{ audio: Buffer; langu
     
     const boundary = '--' + boundaryMatch[1];
     const boundaryBuffer = Buffer.from(boundary);
-    
-    req.on('data', (chunk) => chunks.push(chunk));
+
+    let received = 0;
+    req.on('data', (chunk) => {
+      received += chunk.length;
+      if (received > MAX_BODY_BYTES) {
+        req.destroy();
+        return reject(new Error('Payload too large (max ~10MB)'));
+      }
+      chunks.push(chunk);
+    });
     req.on('end', () => {
       try {
         const body = Buffer.concat(chunks);
@@ -142,6 +177,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const ip =
+    (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ||
+    req.socket?.remoteAddress ||
+    'unknown';
+  if (isRateLimited(ip)) {
+    return res.status(429).json({ error: 'Too many requests - try again in a minute' });
+  }
+
+  const contentLength = parseInt(req.headers['content-length'] || '0', 10);
+  if (contentLength > MAX_BODY_BYTES + MAX_BASE64_CHARS) {
+    return res.status(413).json({ error: 'Payload too large (max ~10MB)' });
+  }
+
   const apiKey = process.env.DEEPGRAM_API_KEY || process.env.deepgram_api;
 
   if (!apiKey) {
@@ -176,7 +224,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!body.audio) {
         return res.status(400).json({ error: 'No audio data provided' });
       }
-      
+
+      if (typeof body.audio !== 'string' || body.audio.length > MAX_BASE64_CHARS) {
+        return res.status(413).json({ error: 'Audio payload too large (max ~10MB)' });
+      }
+
       audioBuffer = Buffer.from(body.audio, 'base64');
       language = body.language || '';
       mimeType = body.mimeType || '';
@@ -244,7 +296,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(response.status).json({ error: `Deepgram error: ${response.status}` });
       }
 
-      const result = await response.json();
+      const result = (await response.json()) as {
+        results?: { channels?: { alternatives?: { transcript?: string; confidence?: number }[] }[] };
+      };
       const transcript = result?.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
       const confidence = result?.results?.channels?.[0]?.alternatives?.[0]?.confidence || 0;
 

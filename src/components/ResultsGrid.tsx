@@ -3,7 +3,9 @@ import { Product } from '../types';
 import { ProductCard } from './ProductCard';
 import { Package, Grid2X2, List, Plus } from 'lucide-react';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { formatPrice, productImageUrl } from '../utils/formatters';
+import { useSearchStore } from '../store/useSearchStore';
+import { useProductStore } from '../store/useProductStore';
+import { formatPrice, productImageUrl, productImageFallbackUrl } from '../utils/formatters';
 import { useOrderStore } from '../store/useOrderStore';
 import { cn } from '../lib/utils';
 
@@ -19,12 +21,13 @@ interface ListItemProps {
 const ListItem = React.memo(function ListItem({ product }: ListItemProps) {
   const [added, setAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [usedFallback, setUsedFallback] = useState(false);
   const addItem = useOrderStore(state => state.addItem);
 
   const handleAdd = useCallback(() => {
     addItem(product, 1);
     setAdded(true);
-    setTimeout(() => setAdded(false), 200);
+    setTimeout(() => setAdded(false), 600);
   }, [addItem, product]);
 
   const hasDims = product.length > 0 || product.width > 0 || product.height > 0;
@@ -36,6 +39,7 @@ const ListItem = React.memo(function ListItem({ product }: ListItemProps) {
     : null;
 
   const imgSrc = productImageUrl(product.sku, product.imageUrl);
+  const fallbackSrc = productImageFallbackUrl(product.sku, product.imageUrl);
 
   const inlineParts: string[] = [];
   if (dims) inlineParts.push(dims);
@@ -53,19 +57,31 @@ const ListItem = React.memo(function ListItem({ product }: ListItemProps) {
       >
         {imgSrc && !imgError ? (
           <img
-            src={imgSrc}
+            src={usedFallback ? fallbackSrc : imgSrc}
             alt={product.description}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
             loading="lazy"
             decoding="async"
-            onError={() => setImgError(true)}
+            onError={() => {
+              if (!usedFallback && fallbackSrc) {
+                setUsedFallback(true);
+              } else {
+                setImgError(true);
+              }
+            }}
           />
         ) : (
           <div
-            className="w-full h-full flex items-center justify-center"
+            className="w-full h-full flex flex-col items-center justify-center gap-1 px-1"
             style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}
           >
             <Package size={28} strokeWidth={1.5} />
+            <span
+              className="font-mono line-clamp-1"
+              style={{ fontSize: 'var(--text-caption)' }}
+            >
+              {product.sku}
+            </span>
           </div>
         )}
       </div>
@@ -104,7 +120,7 @@ const ListItem = React.memo(function ListItem({ product }: ListItemProps) {
       <button
         onClick={handleAdd}
         className={cn(
-          'icon-btn flex-shrink-0',
+          'icon-btn w-11 h-11 flex-shrink-0',
         )}
         style={{
           background: added ? 'var(--success)' : 'var(--accent)',
@@ -124,6 +140,10 @@ const PAGE_SIZE = 48;
 export const ResultsGrid = React.memo(function ResultsGrid({ products, onUploadClick }: ResultsGridProps) {
   const viewMode = useSettingsStore(state => state.viewMode);
   const setViewMode = useSettingsStore(state => state.setViewMode);
+  const query = useSearchStore(state => state.query);
+  const setQuery = useSearchStore(state => state.setQuery);
+  const isLoaded = useProductStore(state => state.isLoaded);
+  const totalProducts = useProductStore(state => state.products.length);
 
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -198,6 +218,39 @@ export const ResultsGrid = React.memo(function ResultsGrid({ products, onUploadC
   );
 
   if (products.length === 0) {
+    const hasActiveSearch = isLoaded && totalProducts > 0 && query.trim().length > 0;
+
+    if (hasActiveSearch) {
+      return (
+        <div className="flex flex-col items-center justify-center py-16 sm:py-24 text-center pt-4">
+          <Package size={64} strokeWidth={1} className="text-[var(--text-muted)] mb-5" />
+          <h2
+            className="font-semibold mb-2"
+            style={{ fontSize: 'var(--text-h2)', color: 'var(--text-primary)' }}
+          >
+            No results for &lsquo;{query}&rsquo;
+          </h2>
+          <p
+            className="mb-6 max-w-sm"
+            style={{ fontSize: 'var(--text-body)', color: 'var(--text-muted)' }}
+          >
+            Try a different search term or clear your search.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button onClick={() => setQuery('')} className="btn-primary">
+              Clear search
+            </button>
+            {onUploadClick && (
+              <button onClick={onUploadClick} className="btn-secondary">
+                <Package size={18} />
+                Upload Catalog
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-col items-center justify-center py-16 sm:py-24 text-center pt-4">
         <Package size={64} strokeWidth={1} className="text-[var(--text-muted)] mb-5" />
@@ -223,11 +276,35 @@ export const ResultsGrid = React.memo(function ResultsGrid({ products, onUploadC
     );
   }
 
+  const resultsCount = (
+    <p className="text-sm text-[var(--text-secondary)]">
+      {query ? (
+        <span>
+          <span className="font-semibold text-[var(--text-primary)]">{products.length}</span> results
+          {products.length > 0 && (
+            <span className="text-[var(--text-muted)]"> of {totalProducts}</span>
+          )}
+        </span>
+      ) : (
+        <span>
+          <span className="font-semibold text-[var(--text-primary)]">{totalProducts}</span> products
+        </span>
+      )}
+    </p>
+  );
+
+  const toolbar = (
+    <div className="flex items-center justify-between mb-4">
+      {resultsCount}
+      {viewToggle}
+    </div>
+  );
+
   if (viewMode === 'grid') {
     return (
       <div className="pt-4">
-        <div className="flex justify-end mb-4">{viewToggle}</div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {toolbar}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
           {productCards}
         </div>
         {hasMore && <div ref={sentinelRef} className="h-px" aria-hidden="true" />}
@@ -237,7 +314,7 @@ export const ResultsGrid = React.memo(function ResultsGrid({ products, onUploadC
 
   return (
     <div className="pt-4">
-      <div className="flex justify-end mb-4">{viewToggle}</div>
+      {toolbar}
       <div className="flex flex-col">{listItems}</div>
       {hasMore && <div ref={sentinelRef} className="h-px" aria-hidden="true" />}
     </div>

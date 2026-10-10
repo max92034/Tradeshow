@@ -1,22 +1,14 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
 import { Mic, Check, Loader2 } from 'lucide-react';
-import { useDeepgramVoiceSearch } from '../hooks/useDeepgramVoiceSearch';
-import { useSearchStore } from '../store/useSearchStore';
+import { useVoiceSearchToQuery } from '../hooks/useVoiceSearchToQuery';
 import { cn } from '../lib/utils';
 
 type VoiceState = 'idle' | 'preparing' | 'listening' | 'processing' | 'success' | 'error';
 
 export function VoiceSearchButton() {
-  const setQuery = useSearchStore(state => state.setQuery);
-  const performSearch = useSearchStore(state => state.performSearch);
   const pressedRef = useRef(false);
 
-  const { isListening, isPreparing, isSupported, transcript, error, isProcessing, startListening, stopListening } = useDeepgramVoiceSearch({
-    onResult: useCallback((text) => {
-      setQuery(text);
-      performSearch(text);
-    }, [setQuery, performSearch]),
-  });
+  const { isListening, isPreparing, isSupported, transcript, error, isProcessing, startListening, stopListening } = useVoiceSearchToQuery();
 
   const [displayError, setDisplayError] = useState<string | null>(null);
   const [displayTranscript, setDisplayTranscript] = useState<string | null>(null);
@@ -71,10 +63,6 @@ export function VoiceSearchButton() {
     setDisplayError(null);
     setDisplayTranscript(null);
 
-    if (document.activeElement && document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
-
     startListening();
   }, [startListening]);
 
@@ -90,27 +78,34 @@ export function VoiceSearchButton() {
 
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onCancel);
+    // handleStart() blurs the active element, so keyup may not reach the
+    // button — listen on window while pressed, same as pointerup.
+    window.addEventListener('keyup', onUp);
 
     return () => {
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onCancel);
+      window.removeEventListener('keyup', onUp);
     };
   }, [handleStop]);
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     e.stopPropagation();
     e.preventDefault();
+    if (document.activeElement && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     handleStart();
   }, [handleStart]);
 
+  const onKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    if (!e.repeat) handleStart();
+  }, [handleStart]);
+
   if (!isSupported) {
-    return (
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-        <div className="px-4 py-2 rounded-xl text-sm bg-[var(--warning)] text-[var(--text-inverse)] text-center shadow-lg">
-          Voice not supported
-        </div>
-      </div>
-    );
+    return null;
   }
 
   const showIndicator = state !== 'idle';
@@ -126,8 +121,10 @@ export function VoiceSearchButton() {
     error: 'bg-[var(--danger)]',
   }[state];
 
-  const iconColor = state === 'preparing' || state === 'processing'
+  const iconColor = state === 'preparing'
     ? 'text-[var(--text-primary)]'
+    : state === 'listening' || state === 'error' || state === 'processing'
+    ? 'text-[var(--on-danger,#fff)]'
     : 'text-[var(--text-inverse)]';
 
   const renderIcon = () => {
@@ -159,7 +156,7 @@ export function VoiceSearchButton() {
           className={cn(
             "absolute bottom-20 px-4 py-2 rounded-xl shadow-lg text-sm max-w-[80vw] text-center whitespace-nowrap transition-opacity duration-200",
             isErrorState
-              ? "bg-[var(--danger)] text-[var(--text-inverse)]"
+              ? "bg-[var(--danger)] text-[var(--on-danger,#fff)]"
               : "bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-soft)]"
           )}
           style={{ bottom: '80px' }}
@@ -171,6 +168,7 @@ export function VoiceSearchButton() {
       <button
         type="button"
         onPointerDown={onPointerDown}
+        onKeyDown={onKeyDown}
         onContextMenu={(e) => e.preventDefault()}
         className={cn(
           "w-16 h-16 rounded-full flex items-center justify-center shadow-lg touch-none relative transition-all duration-200 select-none",
@@ -179,7 +177,7 @@ export function VoiceSearchButton() {
           state === 'error' && 'animate-shake'
         )}
         style={{ WebkitTouchCallout: 'none' }}
-        aria-label="Hold to voice search"
+        aria-label="Voice search: press and hold, or hold Enter or Space"
       >
         {state === 'listening' && (
           <span className="absolute inset-0 rounded-full bg-[var(--danger)] animate-pulse-ring" />

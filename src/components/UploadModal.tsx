@@ -3,6 +3,7 @@ import { X, Upload, FileText, CheckCircle, AlertCircle, Download } from 'lucide-
 import { parseExcelFile, isExcelFile, downloadBlankTemplate } from '../utils/excelParser';
 import { useProductStore } from '../store/useProductStore';
 import { useSearchStore } from '../store/useSearchStore';
+import { useModalA11y } from '../hooks/useModalA11y';
 import { cn } from '../lib/utils';
 
 interface UploadModalProps {
@@ -16,16 +17,25 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function formatUpdatedAt(iso: string): string {
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 export function UploadModal({ isOpen, onClose }: UploadModalProps) {
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [productCount, setProductCount] = useState(0);
+  const [dupeWarning, setDupeWarning] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [progress, setProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const modalRef = useModalA11y(isOpen, onClose);
   const loadProducts = useProductStore(state => state.loadProducts);
+  const lastUpdated = useProductStore(state => state.lastUpdated);
   const performSearch = useSearchStore(state => state.performSearch);
 
   const handleFile = async (file: File) => {
@@ -35,37 +45,36 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
     }
 
     setError(null);
+    setDupeWarning(null);
     setSelectedFile(file);
     setLoading(true);
     setSuccess(false);
     setProgress(30);
 
     try {
-      const products = await parseExcelFile(file);
+      const { products, duplicateSkus } = await parseExcelFile(file);
       setProgress(70);
-      
-      if (products.length === 0) {
-        setError('No products found in the file. Make sure there is a SKU column.');
-        setLoading(false);
-        setProgress(0);
-        return;
-      }
-      
+
       loadProducts(products);
       performSearch('');
       setProductCount(products.length);
+      if (duplicateSkus.length > 0) {
+        const preview = duplicateSkus.slice(0, 3).join(', ');
+        const more = duplicateSkus.length > 3 ? `, +${duplicateSkus.length - 3} more` : '';
+        setDupeWarning(`${duplicateSkus.length} duplicate SKUs found (kept first row): ${preview}${more}`);
+      }
       setProgress(100);
       setSuccess(true);
       setLoading(false);
-      
+
       setTimeout(() => {
         onClose();
         setSuccess(false);
         setSelectedFile(null);
         setProgress(0);
-      }, 1500);
-    } catch {
-      setError('Failed to parse file. Please check the format.');
+      }, duplicateSkus.length > 0 ? 4000 : 1500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to parse file. Please check the format.');
       setLoading(false);
       setProgress(0);
     }
@@ -86,6 +95,7 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
   const handleRemoveFile = () => {
     setSelectedFile(null);
     setError(null);
+    setDupeWarning(null);
     setProgress(0);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -103,15 +113,27 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-modal">
       <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Upload Catalog"
+        tabIndex={-1}
         className="bg-[var(--bg-card)] w-full sm:max-w-lg sm:rounded-xl rounded-t-xl sm:shadow-xl shadow-2xl max-h-[85vh] flex flex-col animate-slide-up sm:animate-scale-enter"
       >
         <div className="flex items-center justify-between px-6 py-6 pb-4 border-b border-[var(--border-soft)] flex-shrink-0">
-          <h2
-            className="font-semibold"
-            style={{ fontSize: 'var(--text-h3)', color: 'var(--text-primary)' }}
-          >
-            Upload Catalog
-          </h2>
+          <div>
+            <h2
+              className="font-semibold"
+              style={{ fontSize: 'var(--text-h3)', color: 'var(--text-primary)' }}
+            >
+              Upload Catalog
+            </h2>
+            {lastUpdated && (
+              <p style={{ fontSize: 'var(--text-caption)', color: 'var(--text-muted)' }}>
+                Catalog updated: {formatUpdatedAt(lastUpdated)}
+              </p>
+            )}
+          </div>
           <button
             onClick={onClose}
             className="icon-btn text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]"
@@ -156,6 +178,14 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
                   <p style={{ fontSize: 'var(--text-small)', color: 'var(--text-muted)' }}>
                     Ready to search
                   </p>
+                  {dupeWarning && (
+                    <p
+                      role="alert"
+                      style={{ fontSize: 'var(--text-small)', color: 'var(--warning)' }}
+                    >
+                      {dupeWarning}
+                    </p>
+                  )}
                 </div>
               </div>
             ) : error ? (
@@ -196,7 +226,7 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
                 <p
                   style={{ fontSize: 'var(--text-caption)', color: 'var(--text-muted)' }}
                 >
-                  Supports XLSX, CSV, PDF
+                  Supports XLSX, CSV
                 </p>
               </>
             )}
@@ -205,7 +235,7 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".xlsx,.xls,.csv,.pdf"
+            accept=".xlsx,.xls,.csv"
             onChange={handleFileInput}
             className="hidden"
           />

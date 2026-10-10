@@ -1,7 +1,8 @@
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { Product, Order, OrderItem, Buyer } from '../types';
 import { calculateSubtotal, calculateTotalItems, calculateTotalCartons, generateId } from '../utils/formatters';
-import { loadFromStorage, saveToStorage, storageKeys } from '../utils/storage';
+import { createLegacyJsonStorage } from '../utils/legacyStorage';
 
 interface OrderState {
   currentOrder: Order;
@@ -9,7 +10,6 @@ interface OrderState {
   isDrawerOpen: boolean;
   addItem: (product: Product, qty?: number) => void;
   removeItem: (sku: string) => void;
-  updateQuantity: (sku: string, qty: number) => void;
   setBuyer: (buyer: Partial<Buyer>) => void;
   saveOrder: () => void;
   loadOrder: (id: string) => void;
@@ -74,14 +74,12 @@ function migrateOrders(orders: unknown): Order[] {
     });
 }
 
-const rawSavedOrders = loadFromStorage<Order[]>(storageKeys.ORDERS);
-const savedOrders = rawSavedOrders ? migrateOrders(rawSavedOrders) : [];
-
-export const useOrderStore = create<OrderState>((set, get) => ({
+export const useOrderStore = create<OrderState>()(
+  persist(
+    (set, get) => ({
   currentOrder: createEmptyOrder(),
-  savedOrders,
+  savedOrders: [],
   isDrawerOpen: false,
-  
   addItem: (product: Product, qty = 1) => {
     const order = { ...get().currentOrder };
     const existing = order.items.find(i => i.sku === product.sku);
@@ -128,22 +126,6 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     set({ currentOrder: order });
   },
   
-  updateQuantity: (sku: string, qty: number) => {
-    if (qty <= 0) {
-      get().removeItem(sku);
-      return;
-    }
-    const order = { ...get().currentOrder };
-    order.items = order.items.map(i => 
-      i.sku === sku ? { ...i, quantity: qty } : i
-    );
-    order.subtotal = calculateSubtotal(order.items);
-    order.totalItems = calculateTotalItems(order.items);
-    order.totalCartons = calculateTotalCartons(order.items);
-    order.updatedAt = new Date().toISOString();
-    set({ currentOrder: order });
-  },
-  
   setBuyer: (buyer: Partial<Buyer>) => {
     const order = { ...get().currentOrder };
     order.buyer = {
@@ -174,8 +156,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     } else {
       saved.unshift(orderToSave);
     }
-    
-    saveToStorage(storageKeys.ORDERS, saved);
+
     set({ savedOrders: saved, currentOrder: orderToSave });
   },
   
@@ -207,7 +188,6 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         return;
       }
       const saved = currentSaved.filter(o => o && o.id !== id);
-      saveToStorage(storageKeys.ORDERS, saved);
       set({ savedOrders: saved });
 
       if (get().currentOrder?.id === id) {
@@ -215,7 +195,6 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       }
     } catch (e) {
       console.error('Failed to delete order:', e);
-      saveToStorage(storageKeys.ORDERS, []);
       set({ savedOrders: [], currentOrder: createEmptyOrder() });
     }
   },
@@ -235,4 +214,15 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     order.totalCartons = calculateTotalCartons(order.items);
     set({ currentOrder: order });
   },
-}));
+    }),
+    {
+      name: 'tradeshow_orders',
+      storage: createJSONStorage(() =>
+        createLegacyJsonStorage<Order[]>((legacy) => ({
+          savedOrders: migrateOrders(legacy),
+        }))
+      ),
+      partialize: (state) => ({ savedOrders: state.savedOrders }),
+    }
+  )
+);

@@ -68,11 +68,12 @@
     --accent-hover: #005bb5;
     --accent-soft: #e8f1fa;
     --accent-muted: #f0f7ff;
-    --border: #d1d1d6;
+    --border: #c7c7cc;
     --border-soft: #e5e5ea;
     --success: #34c759;
     --warning: #ff9500;
     --danger: #ff3b30;
+    --on-danger: #ffffff;
     --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
     --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
     --shadow-lg: 0 12px 32px rgba(0,0,0,0.08);
@@ -85,11 +86,11 @@
   .theme-dark {
     --bg-primary: #000000;
     --bg-secondary: #1c1c1e;
-    --bg-card: #1c1c1e;
+    --bg-card: #202022;
     --bg-elevated: #2c2c2e;
     --text-primary: #ffffff;
     --text-secondary: #ebebf5;
-    --text-muted: #8e8e93;
+    --text-muted: #98989e;
     --text-inverse: #1c1c1e;
     --accent: #0a84ff;
     --accent-hover: #409cff;
@@ -100,6 +101,7 @@
     --success: #30d158;
     --warning: #ff9f0a;
     --danger: #ff453a;
+    --on-danger: #ffffff;
     --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
     --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
     --shadow-lg: 0 12px 32px rgba(0,0,0,0.5);
@@ -116,7 +118,7 @@
     --bg-elevated: #1f1f1f;
     --text-primary: #f5f5f0;
     --text-secondary: #c8c8c0;
-    --text-muted: #7a7a72;
+    --text-muted: #9a9a90;
     --text-inverse: #0f0f0f;
     --accent: #c9a96e;
     --accent-hover: #dbbc82;
@@ -127,6 +129,7 @@
     --success: #4ade80;
     --warning: #fbbf24;
     --danger: #f87171;
+    --on-danger: #ffffff;
     --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
     --shadow-md: 0 4px 12px rgba(0,0,0,0.5);
     --shadow-lg: 0 12px 32px rgba(0,0,0,0.6);
@@ -136,8 +139,7 @@
 /* ========================================
    GOLD MODE — Gradient text for headings
    ======================================== */
-  .theme-gold h1,
-  .theme-gold h2 {
+  .theme-gold .gradient-heading {
     background: linear-gradient(135deg, #c9a96e 0%, #e8d5a3 50%, #c9a96e 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -165,14 +167,14 @@
     --success: #34c759;
     --warning: #ff9500;
     --danger: #ff3b30;
+    --on-danger: #ffffff;
     --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
     --shadow-md: 0 4px 12px rgba(0,0,0,0.5);
     --shadow-lg: 0 12px 32px rgba(0,0,0,0.6);
     --shadow-xl: 0 24px 48px rgba(0,0,0,0.7);
   }
 
-  .theme-lakers h1,
-  .theme-lakers h2 {
+  .theme-lakers .gradient-heading {
     background: linear-gradient(135deg, #552583 0%, #ffce32 50%, #552583 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -263,7 +265,7 @@
   .btn-danger {
     @apply inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all duration-150 active:scale-[0.97];
     background: var(--danger);
-    color: var(--text-inverse);
+    color: var(--on-danger);
     box-shadow: var(--shadow-sm);
   }
   .btn-danger:hover {
@@ -278,10 +280,12 @@
     transition: all 200ms ease;
   }
 
-  .card-hover:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
-    border-color: var(--border);
+  @media (hover: hover) {
+    .card-hover:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+      border-color: var(--border);
+    }
   }
 
   .input-field {
@@ -313,8 +317,8 @@
 
   .icon-btn {
     @apply inline-flex items-center justify-center rounded-full transition-all duration-150 active:scale-[0.95];
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
   }
 }
 

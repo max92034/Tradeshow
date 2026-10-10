@@ -41,6 +41,9 @@ export function BuyerInfoForm() {
 
   const selectedCountry = countries.find(c => c.code === buyer?.nationality);
 
+  const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const emailInvalid = !!buyer?.email?.trim() && !EMAIL_PATTERN.test(buyer.email.trim());
+
   const handleSelectCountry = (code: string) => {
     setBuyer({ nationality: code });
     setNationalityOpen(false);
@@ -142,10 +145,18 @@ export function BuyerInfoForm() {
                   onChange={(e) => setBuyer({ email: e.target.value })}
                   className={cn(
                     "input-field",
-                    requiredFields.email && "input-field-error"
+                    (requiredFields.email || emailInvalid) && "input-field-error"
                   )}
                   placeholder="Enter email"
                 />
+                {emailInvalid && (
+                  <p
+                    className="mt-1 text-xs"
+                    style={{ color: 'var(--danger)' }}
+                  >
+                    Please enter a valid email address
+                  </p>
+                )}
               </div>
               
               <div className="relative" ref={dropdownRef}>

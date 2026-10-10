@@ -5,8 +5,13 @@ export function formatPrice(price: number): string {
   return `$${price.toFixed(2)}`;
 }
 
+// Sum in integer cents to avoid floating-point drift across line items.
 export function calculateSubtotal(items: OrderItem[]): number {
-  return items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+  const cents = items.reduce(
+    (sum, item) => sum + Math.round(item.quantity * item.unitPrice * 100),
+    0
+  );
+  return cents / 100;
 }
 
 export function calculateTotalItems(items: OrderItem[]): number {
@@ -52,10 +57,17 @@ export function normalizeImageUrl(url: string): string {
 
 const CLOUDFRONT_PHOTO_BASE = 'https://d2smnk90fd10gg.cloudfront.net/commodity/photo';
 
-// Product photos follow the convention `<SKU>-1.jpg` on CloudFront, so the
+// Product photos follow the convention `<SKU>.jpg` on CloudFront, so the
 // IMG column is optional — fall back to the SKU-derived URL when it's empty.
 export function productImageUrl(sku: string, imageUrl: string): string {
   const direct = normalizeImageUrl(imageUrl);
   if (direct) return direct;
+  return sku ? `${CLOUDFRONT_PHOTO_BASE}/${encodeURIComponent(sku)}.jpg` : '';
+}
+
+// Older photos were uploaded as `<SKU>-1.jpg`, so if the base-name URL fails,
+// components retry once with this before showing the placeholder.
+export function productImageFallbackUrl(sku: string, imageUrl: string): string {
+  if (normalizeImageUrl(imageUrl)) return '';
   return sku ? `${CLOUDFRONT_PHOTO_BASE}/${encodeURIComponent(sku)}-1.jpg` : '';
 }
